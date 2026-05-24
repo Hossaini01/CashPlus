@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <title>CashPlus – Rewards Center</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src='//libtl.com/sdk.js' data-zone='11052002' data-sdk='show_11052002'></script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet"/>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -474,6 +475,7 @@ TG?.ready();
 TG?.expand();
 
 const BOT_USERNAME = 'CashPlus_Bot';
+const MINI_APP_NAME = 'cashplus'; // GitHub repo name (lowercase)
 const TASKS = [
   {id:'t1', channel:'https://t.me/Beast_Hac1k',   reward:.08, icon:'📢', name:'Beast Hack Channel'},
   {id:'t2', channel:'https://t.me/Money_Plus12',   reward:.08, icon:'💵', name:'Money Plus Channel'},
@@ -743,25 +745,24 @@ function updateAdUI(){
 
 function watchAd(){
   if(adCount >= MAX_ADS){ showToast('Max ads watched today!'); return; }
+
   const overlay = document.getElementById('ad-loading');
   const spinner = document.getElementById('ad-spinner');
   const successIcon = document.getElementById('ad-success-icon');
   const loadingText = document.getElementById('ad-loading-text');
   const amountEl = document.getElementById('ad-loading-amount');
 
+  // Show loading overlay while ad loads
   overlay.classList.add('show');
   spinner.style.display = 'block';
   successIcon.style.display = 'none';
   amountEl.textContent = '+$0.30';
   loadingText.textContent = 'Loading ad...';
 
-  let sec = 0;
-  const msgs = ['Loading ad...','Ad playing... (5s)','Almost done...','Finishing up...'];
-  const interval = setInterval(()=>{
-    sec++;
-    loadingText.textContent = msgs[Math.min(sec-1, msgs.length-1)] || msgs[msgs.length-1];
-    if(sec>=10){
-      clearInterval(interval);
+  // Use Monetag rewarded interstitial
+  if(typeof show_11052002 === 'function'){
+    show_11052002().then(() => {
+      // Ad watched successfully — reward user
       spinner.style.display = 'none';
       successIcon.style.display = 'block';
       loadingText.textContent = t('ad_done');
@@ -772,8 +773,33 @@ function watchAd(){
       updateBalance(AD_PER_VIEW);
       updateAdUI();
       setTimeout(()=>{ overlay.classList.remove('show'); }, 1800);
-    }
-  }, 1000);
+    }).catch(() => {
+      // Ad failed or was skipped — no reward
+      overlay.classList.remove('show');
+      showToast('Ad was not completed. Please try again.');
+    });
+  } else {
+    // Fallback: SDK not loaded yet, simulate with timer
+    let sec = 0;
+    const msgs = ['Loading ad...','Ad playing...','Almost done...','Finishing up...'];
+    const interval = setInterval(()=>{
+      sec++;
+      loadingText.textContent = msgs[Math.min(sec-1, msgs.length-1)];
+      if(sec>=10){
+        clearInterval(interval);
+        spinner.style.display = 'none';
+        successIcon.style.display = 'block';
+        loadingText.textContent = t('ad_done');
+        adCount++;
+        adsTotalEarned += AD_PER_VIEW;
+        save('cp_ads_today', adCount);
+        save('cp_ads_earned', adsTotalEarned);
+        updateBalance(AD_PER_VIEW);
+        updateAdUI();
+        setTimeout(()=>{ overlay.classList.remove('show'); }, 1800);
+      }
+    }, 1000);
+  }
 }
 
 document.getElementById('ad-loading').addEventListener('click', ()=>{});
@@ -828,7 +854,7 @@ function renderTasks(){
 // ═══════════════════════════════════════════════════════
 function getInviteLink(){
   const uid = userId || '000000';
-  return `https://t.me/${BOT_USERNAME}?start=${uid}`;
+  return `https://t.me/${BOT_USERNAME}/${MINI_APP_NAME}?startapp=${uid}`;
 }
 
 function renderInvite(){
