@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>CashPlus – Rewards Center</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0a0a12;
+  --surface:#13131f;
+  --card:#1a1a2e;
+  --border:#2a2a45;
+  --gold:#f5c842;
+  --gold2:#e8a820;
+  --gold3:#ffd96a;
+  --green:#22c55e;
+  --red:#ef4444;
+  --text:#f0f0ff;
+  --muted:#8888aa;
+  --accent:#7c6af7;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;overflow:hidden}
+body{display:flex;flex-direction:column}
+
+/* ── LANGUAGE SCREEN ── */
+#lang-screen{
+  position:fixed;inset:0;background:var(--bg);z-index:9999;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;
+  background:radial-gradient(ellipse at 50% 0%,#1e1a3a 0%,var(--bg) 70%);
+}
+.lang-logo{font-size:2.2rem;font-weight:900;letter-spacing:-1px;margin-bottom:8px}
+.lang-logo span{color:var(--gold)}
+.lang-subtitle{color:var(--muted);font-size:.9rem;margin-bottom:32px}
+.lang-title{font-size:1.1rem;font-weight:600;margin-bottom:16px;color:var(--text)}
+.lang-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%;max-width:360px}
+.lang-btn{
+  background:var(--card);border:1.5px solid var(--border);border-radius:14px;
+  padding:12px 10px;cursor:pointer;display:flex;align-items:center;gap:8px;
+  font-family:'Outfit',sans-serif;font-size:.9rem;font-weight:500;color:var(--text);
+  transition:all .2s;
+}
+.lang-btn:hover,.lang-btn.active{border-color:var(--gold);background:#1f1b30;color:var(--gold)}
+.lang-btn .flag{font-size:1.3rem}
+.lang-btn .name{display:flex;flex-direction:column;text-align:left}
+.lang-btn .name small{color:var(--muted);font-size:.7rem;font-weight:400}
+.lang-confirm{
+  margin-top:20px;background:var(--gold);color:#0a0a12;border:none;
+  border-radius:14px;padding:14px 40px;font-family:'Outfit',sans-serif;
+  font-size:1rem;font-weight:700;cursor:pointer;transition:transform .15s,opacity .15s;
+  width:100%;max-width:360px;
+}
+.lang-confirm:active{transform:scale(.97);opacity:.9}
+
+/* ── MAIN APP ── */
+#app{display:flex;flex-direction:column;height:100%;opacity:0;transition:opacity .4s}
+#app.show{opacity:1}
+
+/* HEADER */
+.header{
+  background:var(--surface);border-bottom:1px solid var(--border);
+  padding:10px 16px;display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+}
+.logo{font-size:1.3rem;font-weight:900;letter-spacing:-.5px}
+.logo span{color:var(--gold)}
+.header-btns{display:flex;gap:8px}
+.hbtn{
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:6px 12px;font-size:.75rem;font-weight:500;color:var(--muted);cursor:pointer;
+  display:flex;align-items:center;gap:5px;transition:border-color .2s;
+}
+.hbtn:hover{border-color:var(--gold);color:var(--gold)}
+
+/* BALANCE CARD */
+.balance-card{
+  margin:12px 14px;border-radius:18px;padding:16px 18px;
+  background:linear-gradient(135deg,#1a1530 0%,#0f1228 60%,#1a1530 100%);
+  border:1px solid #2d2850;position:relative;overflow:hidden;flex-shrink:0;
+}
+.balance-card::before{
+  content:'';position:absolute;top:-40px;right:-40px;width:120px;height:120px;
+  background:radial-gradient(circle,rgba(245,200,66,.15) 0%,transparent 70%);
+  border-radius:50%;
+}
+.bal-row{display:flex;align-items:flex-start;justify-content:space-between}
+.bal-left .label{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+.bal-left .amount{font-size:2.2rem;font-weight:800;color:var(--gold);line-height:1}
+.bal-left .sub{font-size:.75rem;color:var(--muted);margin-top:4px}
+.bal-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.user-avatar{width:44px;height:44px;border-radius:50%;border:2px solid var(--gold);object-fit:cover;background:var(--border)}
+.user-name{font-size:.75rem;font-weight:600;color:var(--text);text-align:right}
+.user-id{font-size:.65rem;color:var(--muted)}
+.bal-actions{display:flex;gap:8px;margin-top:12px}
+.bal-action{
+  flex:1;background:rgba(255,255,255,.05);border:1px solid var(--border);
+  border-radius:10px;padding:7px 0;text-align:center;font-size:.72rem;
+  color:var(--muted);cursor:pointer;transition:all .2s;
+}
+.bal-action:hover{border-color:var(--gold);color:var(--gold)}
+
+/* TABS */
+.tabs{display:flex;background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;order:10}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px;cursor:pointer;border:none;background:none;color:var(--muted);font-family:'Outfit',sans-serif;transition:color .2s}
+.tab svg{width:20px;height:20px}
+.tab span{font-size:.65rem;font-weight:500}
+.tab.active{color:var(--gold)}
+.tab.active svg path,.tab.active svg circle,.tab.active svg rect{stroke:var(--gold)}
+
+/* SCREENS */
+.screen{flex:1;overflow-y:auto;padding:0 0 8px;display:none}
+.screen.active{display:block}
+
+/* ADS SCREEN */
+.section-title{padding:12px 16px 6px;font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.ad-card{
+  margin:0 14px 10px;background:var(--card);border:1px solid var(--border);
+  border-radius:16px;overflow:hidden;
+}
+.ad-watch-btn{
+  display:flex;align-items:center;gap:12px;padding:16px;cursor:pointer;
+  background:linear-gradient(135deg,var(--card),#1e1b38);transition:background .2s;
+}
+.ad-watch-btn:active{background:#22203a}
+.ad-icon{
+  width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,var(--gold2),var(--gold3));
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.ad-icon svg{width:24px;height:24px}
+.ad-info{flex:1}
+.ad-info .title{font-size:.95rem;font-weight:700}
+.ad-info .desc{font-size:.75rem;color:var(--muted);margin-top:2px}
+.ad-reward{font-size:1.1rem;font-weight:800;color:var(--gold);white-space:nowrap}
+.ad-progress-wrap{padding:0 16px 14px;display:flex;align-items:center;gap:10px}
+.ad-progress-bar{flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.ad-progress-fill{height:100%;background:linear-gradient(90deg,var(--gold2),var(--gold3));border-radius:3px;transition:width .4s}
+.ad-count{font-size:.75rem;color:var(--muted);font-family:'JetBrains Mono',monospace;white-space:nowrap}
+
+.stats-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 14px 10px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px}
+.stat-card .label{font-size:.7rem;color:var(--muted);margin-bottom:4px}
+.stat-card .value{font-size:1.3rem;font-weight:800;color:var(--gold)}
+
+/* LOADING OVERLAY */
+.loading-overlay{
+  position:fixed;inset:0;background:rgba(10,10,18,.9);z-index:999;
+  display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+}
+.loading-overlay.show{display:flex}
+.spinner{width:48px;height:48px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-overlay p{font-size:.95rem;color:var(--muted)}
+.loading-overlay .amount-big{font-size:2rem;font-weight:800;color:var(--gold)}
+.success-check{font-size:3rem;display:none}
+
+/* TASKS SCREEN */
+.task-card{
+  margin:0 14px 10px;background:var(--card);border:1px solid var(--border);
+  border-radius:16px;padding:16px;display:flex;align-items:center;gap:12px;
+}
+.task-icon{width:42px;height:42px;border-radius:11px;background:var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1.2rem}
+.task-info{flex:1}
+.task-info .title{font-size:.9rem;font-weight:600}
+.task-info .desc{font-size:.72rem;color:var(--muted);margin-top:2px}
+.task-info .prog{font-size:.68rem;color:var(--muted);margin-top:4px}
+.task-btn{
+  padding:8px 16px;border-radius:10px;border:none;font-family:'Outfit',sans-serif;
+  font-size:.8rem;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .2s;
+}
+.task-btn.join{background:var(--gold);color:#0a0a12}
+.task-btn.done{background:#1a2a1a;color:var(--green);border:1px solid var(--green)}
+.task-btn.join:active{opacity:.8}
+
+/* INVITE SCREEN */
+.invite-hero{
+  margin:0 14px 14px;background:linear-gradient(135deg,#1a1530,#0f1228);
+  border:1px solid #2d2850;border-radius:18px;padding:20px;text-align:center;
+}
+.invite-hero h2{font-size:1.1rem;font-weight:700;margin-bottom:4px}
+.invite-hero p{font-size:.8rem;color:var(--muted);margin-bottom:16px}
+.invite-reward{font-size:1.8rem;font-weight:800;color:var(--gold);margin:8px 0}
+.link-box{
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:12px 14px;display:flex;align-items:center;gap:10px;margin-bottom:12px;text-align:left;
+}
+.link-box .link-text{flex:1;font-size:.72rem;color:var(--muted);word-break:break-all;font-family:'JetBrains Mono',monospace}
+.copy-btn{
+  background:var(--gold);color:#0a0a12;border:none;border-radius:9px;
+  padding:8px 14px;font-family:'Outfit',sans-serif;font-size:.78rem;font-weight:700;cursor:pointer;
+  white-space:nowrap;transition:transform .15s;
+}
+.copy-btn:active{transform:scale(.95)}
+.share-btn{
+  width:100%;background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:12px;font-family:'Outfit',sans-serif;font-size:.85rem;font-weight:600;
+  color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:border-color .2s;
+}
+.share-btn:hover{border-color:var(--gold);color:var(--gold)}
+.invite-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 14px}
+.invite-stat{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px}
+.invite-stat .label{font-size:.7rem;color:var(--muted);margin-bottom:4px}
+.invite-stat .value{font-size:1.3rem;font-weight:800;color:var(--gold)}
+
+/* WITHDRAW SCREEN */
+.method-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 14px 12px}
+.method-btn{
+  background:var(--card);border:1.5px solid var(--border);border-radius:12px;
+  padding:10px 6px;text-align:center;cursor:pointer;transition:all .2s;
+}
+.method-btn .icon{font-size:1.4rem;margin-bottom:4px}
+.method-btn .name{font-size:.6rem;color:var(--muted);font-weight:500}
+.method-btn.active{border-color:var(--gold);background:#1f1b30}
+.method-btn.active .name{color:var(--gold)}
+
+.withdraw-form{margin:0 14px 14px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px}
+.form-label{font-size:.75rem;color:var(--gold);font-weight:600;margin-bottom:6px;display:block}
+.form-input{
+  width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;
+  padding:11px 14px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;
+  outline:none;transition:border-color .2s;margin-bottom:12px;
+}
+.form-input:focus{border-color:var(--gold)}
+.form-hint{font-size:.7rem;color:var(--muted);margin-top:-8px;margin-bottom:12px}
+.submit-btn{
+  width:100%;background:linear-gradient(135deg,var(--gold2),var(--gold3));color:#0a0a12;
+  border:none;border-radius:12px;padding:14px;font-family:'Outfit',sans-serif;
+  font-size:1rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:transform .15s,opacity .15s;
+}
+.submit-btn:active{transform:scale(.98);opacity:.9}
+.submit-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+/* HISTORY */
+.history-section{margin:0 14px}
+.history-title{font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px}
+.history-item{
+  background:var(--card);border:1px solid var(--border);border-radius:14px;
+  padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;
+}
+.history-icon{width:36px;height:36px;border-radius:10px;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0}
+.history-info{flex:1}
+.history-info .method{font-size:.85rem;font-weight:600}
+.history-info .date{font-size:.7rem;color:var(--muted)}
+.history-info .addr{font-size:.65rem;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-top:1px}
+.history-right{text-align:right}
+.history-amount{font-size:1rem;font-weight:700;color:var(--text)}
+.status-badge{
+  font-size:.6rem;font-weight:700;padding:2px 8px;border-radius:6px;margin-top:3px;display:inline-block;
+}
+.status-badge.paid{background:#0d2d1a;color:var(--green)}
+.status-badge.pending{background:#2d2010;color:#f5a023}
+.status-badge.processing{background:#1a1530;color:var(--accent)}
+
+/* PROCESSING SCREEN */
+.processing-card{
+  margin:0 14px;background:var(--card);border:1px solid var(--border);
+  border-radius:18px;padding:32px 24px;text-align:center;margin-bottom:14px;
+}
+.proc-spinner{width:56px;height:56px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px}
+.proc-amount{font-size:2.5rem;font-weight:800;color:var(--gold)}
+.proc-status{font-size:1rem;font-weight:700;color:#f5a023;margin:6px 0}
+.proc-desc{font-size:.82rem;color:var(--muted)}
+.proc-success .proc-spinner{display:none}
+.proc-check{font-size:3.5rem;margin-bottom:8px}
+.proc-success .proc-amount{color:var(--green)}
+
+/* TOAST */
+.toast{
+  position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:#1e1e30;border:1px solid var(--gold);border-radius:12px;
+  padding:10px 20px;font-size:.85rem;font-weight:600;color:var(--gold);
+  opacity:0;transition:all .3s;pointer-events:none;z-index:9999;white-space:nowrap;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* RTL support */
+[dir="rtl"]{direction:rtl}
+.rtl-text{text-align:right}
+
+/* Scrollbar */
+.screen::-webkit-scrollbar{width:4px}
+.screen::-webkit-scrollbar-track{background:transparent}
+.screen::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+</style>
+</head>
+<body>
+
+<!-- LANGUAGE SELECTION -->
+<div id="lang-screen">
+  <div class="lang-logo">Cash<span>Plus</span></div>
+  <div class="lang-subtitle">Rewards Center</div>
+  <div class="lang-title" id="lang-prompt">Choose your language</div>
+  <div class="lang-grid" id="lang-grid"></div>
+  <button class="lang-confirm" id="lang-confirm">Confirm</button>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <div class="header">
+    <div class="logo">Cash<span>Plus</span></div>
+    <div class="header-btns">
+      <button class="hbtn" id="support-btn">💬 <span id="txt-support">Support</span></button>
+      <button class="hbtn" id="lang-change-btn">🌐 <span id="txt-lang-label">EN</span></button>
+    </div>
+  </div>
+
+  <!-- BALANCE CARD -->
+  <div class="balance-card">
+    <div class="bal-row">
+      <div class="bal-left">
+        <div class="label" id="txt-total-balance">TOTAL BALANCE</div>
+        <div class="amount" id="user-balance">$0.00</div>
+        <div class="sub" id="txt-avail-withdraw">Available to withdraw</div>
+      </div>
+      <div class="bal-right">
+        <img class="user-avatar" id="user-avatar" src="" alt=""/>
+        <div class="user-name" id="user-name">Loading...</div>
+        <div class="user-id" id="user-id">ID: ...</div>
+      </div>
+    </div>
+    <div class="bal-actions">
+      <div class="bal-action" onclick="switchTab('ads')" id="txt-watch-ads">▶ Watch Ads</div>
+      <div class="bal-action" onclick="switchTab('tasks')" id="txt-tasks">✓ Tasks</div>
+      <div class="bal-action" onclick="switchTab('invite')" id="txt-invite-friends">👥 Invite</div>
+    </div>
+  </div>
+
+  <!-- SCREENS -->
+  <div class="screen active" id="screen-ads">
+    <div class="section-title" id="txt-earn-watching">EARN BY WATCHING</div>
+    <div class="ad-card">
+      <div class="ad-watch-btn" id="watch-ad-btn">
+        <div class="ad-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#0a0a12" stroke-width="2.5"><polygon points="5,3 19,12 5,21"/></svg>
+        </div>
+        <div class="ad-info">
+          <div class="title" id="txt-watch-ad">Watch Ad</div>
+          <div class="desc" id="txt-watch-desc">Watch full ad to earn</div>
+        </div>
+        <div class="ad-reward">+$6</div>
+      </div>
+      <div class="ad-progress-wrap">
+        <div class="ad-progress-bar"><div class="ad-progress-fill" id="ad-progress-fill" style="width:0%"></div></div>
+        <div class="ad-count" id="ad-count-display">0 / 20</div>
+      </div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="label" id="txt-total-earned">Total Earned from Ads</div>
+        <div class="value" id="ads-total-earned">$0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="label" id="txt-ads-watched">Ads Watched Today</div>
+        <div class="value" id="ads-watched-today">0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen" id="screen-tasks">
+    <div class="section-title" id="txt-complete-tasks">COMPLETE TASKS & EARN</div>
+    <!-- tasks injected by JS -->
+  </div>
+
+  <div class="screen" id="screen-invite">
+    <div class="invite-hero">
+      <h2 id="txt-invite-earn">Invite & Earn</h2>
+      <p id="txt-invite-desc">Get paid for every friend you invite</p>
+      <div class="invite-reward">+$0.60 <span style="font-size:.8rem;color:var(--muted);font-weight:400" id="txt-per-invite">per invite</span></div>
+      <div class="link-box">
+        <div class="link-text" id="invite-link-text">https://t.me/CashPlus_Bot?start=...</div>
+        <button class="copy-btn" id="copy-link-btn">📋 <span id="txt-copy">Copy</span></button>
+      </div>
+      <button class="share-btn" id="share-btn">📤 <span id="txt-share-friends">Share with Friends</span></button>
+    </div>
+    <div class="invite-stats">
+      <div class="invite-stat">
+        <div class="label" id="txt-earned-from-invites">Earned from Invites</div>
+        <div class="value" id="invite-earned">$0.00</div>
+      </div>
+      <div class="invite-stat">
+        <div class="label" id="txt-friends-invited">Friends Invited</div>
+        <div class="value" id="invite-count">0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen" id="screen-withdraw">
+    <div class="section-title" id="txt-payment-method">PAYMENT METHOD</div>
+    <div class="method-row">
+      <div class="method-btn active" data-method="usdt" onclick="selectMethod(this,'usdt')">
+        <div class="icon">🪙</div><div class="name">USDT TRC20</div>
+      </div>
+      <div class="method-btn" data-method="paypal" onclick="selectMethod(this,'paypal')">
+        <div class="icon">🅿️</div><div class="name">PayPal</div>
+      </div>
+      <div class="method-btn" data-method="card" onclick="selectMethod(this,'card')">
+        <div class="icon">💳</div><div class="name">Credit Card</div>
+      </div>
+      <div class="method-btn" data-method="payeer" onclick="selectMethod(this,'payeer')">
+        <div class="icon">💰</div><div class="name">Payeer</div>
+      </div>
+    </div>
+
+    <div class="withdraw-form" id="withdraw-form">
+      <label class="form-label" id="txt-amount">AMOUNT</label>
+      <input type="number" class="form-input" id="withdraw-amount" placeholder="0.00" min="18"/>
+      <div class="form-hint" id="withdraw-hint"></div>
+      <label class="form-label" id="txt-address-label">USDT TRC20 WALLET ADDRESS</label>
+      <input type="text" class="form-input" id="withdraw-address" placeholder="TXyz...abc"/>
+      <div class="form-hint" id="txt-address-hint">Enter your USDT TRC20 wallet address</div>
+      <button class="submit-btn" id="submit-withdraw-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        <span id="txt-submit-request">Submit Withdrawal Request</span>
+      </button>
+    </div>
+
+    <!-- Processing / Success card shown inline -->
+    <div class="processing-card" id="processing-card" style="display:none">
+      <div id="proc-inner">
+        <div class="proc-spinner"></div>
+        <div class="proc-amount" id="proc-amount">$0.00</div>
+        <div class="proc-status" id="txt-processing">Processing...</div>
+        <div class="proc-desc" id="txt-proc-desc">Your withdrawal is being processed. Please wait.</div>
+      </div>
+    </div>
+
+    <div class="history-section" id="history-section" style="margin-top:8px">
+      <div class="history-title" id="txt-withdrawal-history">WITHDRAWAL HISTORY</div>
+      <div id="history-list"></div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('ads')" id="tab-ads">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16" fill="currentColor" stroke="none"/></svg>
+      <span id="txt-tab-ads">Ads</span>
+    </button>
+    <button class="tab" onclick="switchTab('tasks')" id="tab-tasks">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,11 12,14 22,4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      <span id="txt-tab-tasks">Tasks</span>
+    </button>
+    <button class="tab" onclick="switchTab('invite')" id="tab-invite">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span id="txt-tab-invite">Invite</span>
+    </button>
+    <button class="tab" onclick="switchTab('withdraw')" id="tab-withdraw">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+      <span id="txt-tab-withdraw">Withdraw</span>
+    </button>
+  </div>
+</div>
+
+<!-- LOADING OVERLAY (for ad watching) -->
+<div class="loading-overlay" id="ad-loading">
+  <div class="success-check" id="ad-success-icon">✅</div>
+  <div class="spinner" id="ad-spinner"></div>
+  <div class="amount-big" id="ad-loading-amount">+$0.30</div>
+  <p id="ad-loading-text">Loading ad...</p>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════
+const TG = window.Telegram?.WebApp;
+TG?.ready();
+TG?.expand();
+
+const BOT_USERNAME = 'CashPlus_Bot';
+const TASKS = [
+  {id:'t1', channel:'https://t.me/Beast_Hac1k',   reward:.08, icon:'📢', name:'Beast Hack Channel'},
+  {id:'t2', channel:'https://t.me/Money_Plus12',   reward:.08, icon:'💵', name:'Money Plus Channel'},
+  {id:'t3', bot:'https://t.me/Money_Plus12_Bot/moneyplus?startapp=6423335359', reward:.08, icon:'🤖', name:'Start Money Plus Bot'},
+  {id:'t4', channel:'https://t.me/FREE_PREMUIM2',  reward:.08, icon:'⭐', name:'Free Premium Channel'},
+];
+
+const LANGS = [
+  {code:'en', name:'English',    native:'English',    flag:'🇬🇧'},
+  {code:'fa', name:'Persian',    native:'فارسی',       flag:'🇮🇷'},
+  {code:'ar', name:'Arabic',     native:'العربية',     flag:'🇸🇦'},
+  {code:'es', name:'Spanish',    native:'Español',     flag:'🇪🇸'},
+  {code:'ru', name:'Russian',    native:'Русский',     flag:'🇷🇺'},
+  {code:'fr', name:'French',     native:'Français',    flag:'🇫🇷'},
+  {code:'hi', name:'Hindi',      native:'हिन्दी',      flag:'🇮🇳'},
+  {code:'pt', name:'Portuguese', native:'Português',   flag:'🇧🇷'},
+  {code:'tr', name:'Turkish',    native:'Türkçe',      flag:'🇹🇷'},
+  {code:'id', name:'Indonesian', native:'Bahasa',      flag:'🇮🇩'},
+];
+
+// i18n strings
+const I18N = {
+  en:{
+    choose_lang:'Choose your language', confirm:'Confirm', support:'Support',
+    total_balance:'TOTAL BALANCE', avail_withdraw:'Available to withdraw',
+    watch_ads:'▶ Watch Ads', tasks:'✓ Tasks', invite_tab:'👥 Invite',
+    earn_watching:'EARN BY WATCHING', watch_ad:'Watch Ad', watch_desc:'Watch full video ad and earn',
+    total_earned:'Total Earned from Ads', ads_watched:'Ads Watched Today',
+    complete_tasks:'COMPLETE TASKS & EARN', join:'Join', done:'✓ Done', start:'Start',
+    invite_earn:'Invite & Earn', invite_desc:'Get paid for every friend you invite',
+    per_invite:'per invite', copy:'Copy', share_friends:'Share with Friends',
+    earned_invites:'Earned from Invites', friends_invited:'Friends Invited',
+    payment_method:'PAYMENT METHOD', amount:'AMOUNT', address_label:'USDT TRC20 WALLET ADDRESS',
+    address_hint:'Enter your USDT TRC20 wallet address', submit_request:'Submit Withdrawal Request',
+    processing:'Processing...', proc_desc:'Your withdrawal is being processed. Please wait.',
+    withdrawal_history:'WITHDRAWAL HISTORY', tab_ads:'Ads', tab_tasks:'Tasks',
+    tab_invite:'Invite', tab_withdraw:'Withdraw', copied:'Link copied!',
+    ad_done:'+$0.30 added to your balance!', min_withdraw:'Minimum withdrawal: $18',
+    avail:'Available: ', insufficient:'Insufficient balance. Min $18 required.',
+    fill_fields:'Please fill all fields.', req_submitted:'Withdrawal request submitted!',
+    no_history:'No withdrawal history yet.',
+  },
+  fa:{
+    choose_lang:'زبان مورد نظر خود را انتخاب کنید', confirm:'تأیید', support:'پشتیبانی',
+    total_balance:'موجودی کل', avail_withdraw:'قابل برداشت',
+    watch_ads:'▶ تماشای آگهی', tasks:'✓ وظایف', invite_tab:'👥 دعوت',
+    earn_watching:'تماشا کن، درآمد کسب کن', watch_ad:'تماشای آگهی', watch_desc:'ویدیو را کامل ببینید و درآمد کسب کنید',
+    total_earned:'کل درآمد از آگهی', ads_watched:'آگهی‌های تماشا شده امروز',
+    complete_tasks:'انجام وظایف و کسب درآمد', join:'عضویت', done:'✓ انجام شد', start:'شروع',
+    invite_earn:'دعوت کن، درآمد کسب کن', invite_desc:'به ازای هر دعوت $0.60 دریافت کنید',
+    per_invite:'به ازای هر دعوت', copy:'کپی', share_friends:'اشتراکگذاری با دوستان',
+    earned_invites:'درآمد از دعوت‌ها', friends_invited:'دوستان دعوت شده',
+    payment_method:'روش پرداخت', amount:'مبلغ', address_label:'آدرس کیف پول USDT TRC20',
+    address_hint:'آدرس کیف پول USDT TRC20 خود را وارد کنید', submit_request:'ثبت درخواست برداشت',
+    processing:'در حال پردازش...', proc_desc:'درخواست برداشت شما در حال پردازش است. لطفاً صبر کنید.',
+    withdrawal_history:'تاریخچه برداشت', tab_ads:'آگهی‌ها', tab_tasks:'وظایف',
+    tab_invite:'دعوت', tab_withdraw:'برداشت', copied:'لینک کپی شد!',
+    ad_done:'+$0.30 به موجودی شما اضافه شد!', min_withdraw:'حداقل برداشت: $18',
+    avail:'موجود: ', insufficient:'موجودی کافی نیست. حداقل $18 لازم است.',
+    fill_fields:'لطفاً تمام فیلدها را پر کنید.', req_submitted:'درخواست برداشت ثبت شد!',
+    no_history:'تاریخچه برداشتی وجود ندارد.',
+  },
+  ar:{
+    choose_lang:'اختر لغتك المفضلة', confirm:'تأكيد', support:'الدعم',
+    total_balance:'الرصيد الإجمالي', avail_withdraw:'متاح للسحب',
+    watch_ads:'▶ مشاهدة الإعلانات', tasks:'✓ المهام', invite_tab:'👥 الدعوة',
+    earn_watching:'شاهد واكسب', watch_ad:'مشاهدة إعلان', watch_desc:'شاهد الفيديو كاملاً واكسب',
+    total_earned:'إجمالي الأرباح من الإعلانات', ads_watched:'الإعلانات المشاهدة اليوم',
+    complete_tasks:'أكمل المهام واكسب', join:'انضمام', done:'✓ تم', start:'ابدأ',
+    invite_earn:'ادعُ واكسب', invite_desc:'احصل على $0.60 لكل صديق تدعوه',
+    per_invite:'لكل دعوة', copy:'نسخ', share_friends:'مشاركة مع الأصدقاء',
+    earned_invites:'الأرباح من الدعوات', friends_invited:'الأصدقاء المدعوون',
+    payment_method:'طريقة الدفع', amount:'المبلغ', address_label:'عنوان محفظة USDT TRC20',
+    address_hint:'أدخل عنوان محفظة USDT TRC20', submit_request:'تقديم طلب السحب',
+    processing:'جاري المعالجة...', proc_desc:'طلب السحب قيد المعالجة. الرجاء الانتظار.',
+    withdrawal_history:'سجل السحب', tab_ads:'إعلانات', tab_tasks:'مهام',
+    tab_invite:'دعوة', tab_withdraw:'سحب', copied:'تم نسخ الرابط!',
+    ad_done:'+$0.30 تمت إضافتها إلى رصيدك!', min_withdraw:'الحد الأدنى للسحب: $18',
+    avail:'متاح: ', insufficient:'الرصيد غير كافٍ. الحد الأدنى $18.',
+    fill_fields:'يرجاء ملء جميع الحقول.', req_submitted:'تم تقديم طلب السحب!',
+    no_history:'لا يوجد سجل سحب حتى الآن.',
+  },
+};
+// Fallback to EN for missing langs
+['es','ru','fr','hi','pt','tr','id'].forEach(c=>I18N[c]=I18N.en);
+
+// ── STORAGE HELPERS ──
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+function load(k,def){try{const v=localStorage.getItem(k);return v!==null?JSON.parse(v):def}catch(e){return def}}
+
+// ── STATE ──
+let lang = load('cp_lang', null);
+let balance = load('cp_balance', 0);
+let adCount = load('cp_ads_today', 0);
+let adLastReset = load('cp_ads_reset', '');
+let adsTotalEarned = load('cp_ads_earned', 0);
+let completedTasks = load('cp_tasks', []);
+let inviteEarned = load('cp_invite_earned', 0);
+let inviteCount = load('cp_invite_count', 0);
+let withdrawHistory = load('cp_withdraw_history', []);
+let selectedMethod = 'usdt';
+
+// ── USER INFO ──
+let userId = '';
+let userName = 'User';
+let userPhoto = '';
+
+function initUser(){
+  if(TG?.initDataUnsafe?.user){
+    const u = TG.initDataUnsafe.user;
+    userId = String(u.id || '');
+    userName = u.first_name || u.username || 'User';
+    if(u.last_name) userName += ' '+u.last_name;
+    userPhoto = u.photo_url || '';
+  } else {
+    userId = '123456789';
+    userName = 'Demo User';
+  }
+}
+
+// ── AD DAILY RESET ──
+function checkAdReset(){
+  const today = new Date().toDateString();
+  if(adLastReset !== today){
+    adCount = 0;
+    adLastReset = today;
+    save('cp_ads_today', 0);
+    save('cp_ads_reset', today);
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  LANGUAGE SCREEN
+// ═══════════════════════════════════════════════════════
+let selectedLang = 'en';
+
+function buildLangScreen(){
+  const grid = document.getElementById('lang-grid');
+  grid.innerHTML = '';
+  LANGS.forEach(l => {
+    const btn = document.createElement('button');
+    btn.className = 'lang-btn' + (l.code===selectedLang?' active':'');
+    btn.innerHTML = `<span class="flag">${l.flag}</span><span class="name">${l.name}<small>${l.native}</small></span>`;
+    btn.onclick = () => {
+      selectedLang = l.code;
+      grid.querySelectorAll('.lang-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+    };
+    grid.appendChild(btn);
+  });
+  document.getElementById('lang-confirm').onclick = confirmLang;
+}
+
+function confirmLang(){
+  lang = selectedLang;
+  save('cp_lang', lang);
+  document.getElementById('lang-screen').style.display = 'none';
+  startApp();
+}
+
+// ═══════════════════════════════════════════════════════
+//  TRANSLATIONS
+// ═══════════════════════════════════════════════════════
+function t(key){ return (I18N[lang]||I18N.en)[key] || I18N.en[key] || key; }
+
+function applyTranslations(){
+  const isRTL = lang==='fa'||lang==='ar';
+  document.body.dir = isRTL ? 'rtl' : 'ltr';
+
+  const map = {
+    'txt-support':'support','txt-total-balance':'total_balance',
+    'txt-avail-withdraw':'avail_withdraw','txt-watch-ads':'watch_ads',
+    'txt-tasks':'tasks','txt-invite-friends':'invite_tab',
+    'txt-earn-watching':'earn_watching','txt-watch-ad':'watch_ad',
+    'txt-watch-desc':'watch_desc','txt-total-earned':'total_earned',
+    'txt-ads-watched':'ads_watched','txt-complete-tasks':'complete_tasks',
+    'txt-invite-earn':'invite_earn','txt-invite-desc':'invite_desc',
+    'txt-per-invite':'per_invite','txt-copy':'copy','txt-share-friends':'share_friends',
+    'txt-earned-from-invites':'earned_invites','txt-friends-invited':'friends_invited',
+    'txt-payment-method':'payment_method','txt-amount':'amount',
+    'txt-address-label':'address_label','txt-address-hint':'address_hint',
+    'txt-submit-request':'submit_request','txt-processing':'processing',
+    'txt-proc-desc':'proc_desc','txt-withdrawal-history':'withdrawal_history',
+    'txt-tab-ads':'tab_ads','txt-tab-tasks':'tab_tasks',
+    'txt-tab-invite':'tab_invite','txt-tab-withdraw':'tab_withdraw',
+  };
+  Object.entries(map).forEach(([id,key])=>{
+    const el=document.getElementById(id);
+    if(el) el.textContent=t(key);
+  });
+  document.getElementById('txt-lang-label').textContent = (LANGS.find(l=>l.code===lang)||{code:'EN'}).code.toUpperCase();
+  updateWithdrawHint();
+}
+
+// ═══════════════════════════════════════════════════════
+//  START APP
+// ═══════════════════════════════════════════════════════
+function startApp(){
+  checkAdReset();
+  initUser();
+  applyTranslations();
+  renderUserCard();
+  renderTasks();
+  renderInvite();
+  renderHistory();
+  updateAdUI();
+  const app = document.getElementById('app');
+  app.classList.add('show');
+
+  document.getElementById('lang-change-btn').onclick = () => {
+    document.getElementById('lang-screen').style.display = 'flex';
+    buildLangScreen();
+    // override confirm to return back
+    document.getElementById('lang-confirm').onclick = () => {
+      lang = selectedLang;
+      save('cp_lang', lang);
+      document.getElementById('lang-screen').style.display = 'none';
+      applyTranslations();
+      renderTasks();
+    };
+  };
+
+  document.getElementById('support-btn').onclick = () => {
+    TG?.openTelegramLink('https://t.me/CashPlus_Bot') || window.open('https://t.me/CashPlus_Bot','_blank');
+  };
+
+  document.getElementById('watch-ad-btn').onclick = watchAd;
+  document.getElementById('copy-link-btn').onclick = copyInviteLink;
+  document.getElementById('share-btn').onclick = shareInvite;
+  document.getElementById('submit-withdraw-btn').onclick = submitWithdraw;
+}
+
+// ── USER CARD ──
+function renderUserCard(){
+  document.getElementById('user-balance').textContent = '$'+balance.toFixed(2);
+  document.getElementById('user-name').textContent = userName;
+  document.getElementById('user-id').textContent = 'ID: '+userId;
+  const avatar = document.getElementById('user-avatar');
+  if(userPhoto){
+    avatar.src = userPhoto;
+    avatar.onerror = ()=>{ avatar.src=''; avatar.style.background='var(--gold)'; };
+  } else {
+    avatar.style.background = 'var(--gold)';
+    avatar.style.display = 'flex';
+  }
+}
+
+function updateBalance(delta){
+  balance = Math.max(0, balance + delta);
+  save('cp_balance', balance);
+  document.getElementById('user-balance').textContent = '$'+balance.toFixed(2);
+}
+
+// ═══════════════════════════════════════════════════════
+//  ADS
+// ═══════════════════════════════════════════════════════
+const AD_PER_VIEW = 0.30;
+const MAX_ADS = 20;
+
+function updateAdUI(){
+  document.getElementById('ad-count-display').textContent = adCount+' / '+MAX_ADS;
+  const pct = (adCount/MAX_ADS)*100;
+  document.getElementById('ad-progress-fill').style.width = pct+'%';
+  document.getElementById('ads-watched-today').textContent = adCount;
+  document.getElementById('ads-total-earned').textContent = '$'+adsTotalEarned.toFixed(2);
+}
+
+function watchAd(){
+  if(adCount >= MAX_ADS){ showToast('Max ads watched today!'); return; }
+  const overlay = document.getElementById('ad-loading');
+  const spinner = document.getElementById('ad-spinner');
+  const successIcon = document.getElementById('ad-success-icon');
+  const loadingText = document.getElementById('ad-loading-text');
+  const amountEl = document.getElementById('ad-loading-amount');
+
+  overlay.classList.add('show');
+  spinner.style.display = 'block';
+  successIcon.style.display = 'none';
+  amountEl.textContent = '+$0.30';
+  loadingText.textContent = 'Loading ad...';
+
+  let sec = 0;
+  const msgs = ['Loading ad...','Ad playing... (5s)','Almost done...','Finishing up...'];
+  const interval = setInterval(()=>{
+    sec++;
+    loadingText.textContent = msgs[Math.min(sec-1, msgs.length-1)] || msgs[msgs.length-1];
+    if(sec>=10){
+      clearInterval(interval);
+      spinner.style.display = 'none';
+      successIcon.style.display = 'block';
+      loadingText.textContent = t('ad_done');
+      adCount++;
+      adsTotalEarned += AD_PER_VIEW;
+      save('cp_ads_today', adCount);
+      save('cp_ads_earned', adsTotalEarned);
+      updateBalance(AD_PER_VIEW);
+      updateAdUI();
+      setTimeout(()=>{ overlay.classList.remove('show'); }, 1800);
+    }
+  }, 1000);
+}
+
+document.getElementById('ad-loading').addEventListener('click', ()=>{});
+
+// ═══════════════════════════════════════════════════════
+//  TASKS
+// ═══════════════════════════════════════════════════════
+function renderTasks(){
+  const container = document.getElementById('screen-tasks');
+  container.innerHTML = `<div class="section-title">${t('complete_tasks')}</div>`;
+  TASKS.forEach((task,i) => {
+    const done = completedTasks.includes(task.id);
+    const div = document.createElement('div');
+    div.className = 'task-card';
+    const isBot = !!task.bot;
+    const link = task.bot || task.channel;
+    const btnLabel = done ? t('done') : (isBot ? t('start') : t('join'));
+    div.innerHTML = `
+      <div class="task-icon">${task.icon}</div>
+      <div class="task-info">
+        <div class="title">${task.name}</div>
+        <div class="desc">+$${task.reward.toFixed(2)}</div>
+      </div>
+      <button class="task-btn ${done?'done':'join'}" data-id="${task.id}" data-link="${link}">
+        ${btnLabel}
+      </button>
+    `;
+    const btn = div.querySelector('.task-btn');
+    if(!done){
+      btn.onclick = () => {
+        // open link
+        if(TG) TG.openTelegramLink(link);
+        else window.open(link,'_blank');
+        // after 3 seconds mark done
+        setTimeout(()=>{
+          if(!completedTasks.includes(task.id)){
+            completedTasks.push(task.id);
+            save('cp_tasks', completedTasks);
+            updateBalance(task.reward);
+            renderTasks();
+            showToast('+$'+task.reward.toFixed(2)+' added!');
+          }
+        }, 3000);
+      };
+    }
+    container.appendChild(div);
+  });
+}
+
+// ═══════════════════════════════════════════════════════
+//  INVITE
+// ═══════════════════════════════════════════════════════
+function getInviteLink(){
+  const uid = userId || '000000';
+  return `https://t.me/${BOT_USERNAME}?start=${uid}`;
+}
+
+function renderInvite(){
+  document.getElementById('invite-link-text').textContent = getInviteLink();
+  document.getElementById('invite-earned').textContent = '$'+inviteEarned.toFixed(2);
+  document.getElementById('invite-count').textContent = inviteCount;
+}
+
+function copyInviteLink(){
+  const link = getInviteLink();
+  if(navigator.clipboard){
+    navigator.clipboard.writeText(link).then(()=>showToast(t('copied')));
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = link;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast(t('copied'));
+  }
+}
+
+function shareInvite(){
+  const link = getInviteLink();
+  if(TG) TG.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent('Join CashPlus and earn real money!')}`);
+  else window.open(`https://t.me/share/url?url=${encodeURIComponent(link)}`,'_blank');
+}
+
+// ═══════════════════════════════════════════════════════
+//  WITHDRAW
+// ═══════════════════════════════════════════════════════
+const METHOD_LABELS = {usdt:'USDT TRC20', paypal:'PayPal', card:'Credit Card', payeer:'Payeer'};
+const METHOD_ICONS = {usdt:'🪙', paypal:'🅿️', card:'💳', payeer:'💰'};
+const METHOD_FIELDS = {
+  usdt:{label:'USDT TRC20 WALLET ADDRESS', placeholder:'TXyz...abc'},
+  paypal:{label:'PAYPAL EMAIL', placeholder:'you@email.com'},
+  card:{label:'CARD NUMBER', placeholder:'4111 1111 1111 1111'},
+  payeer:{label:'PAYEER ACCOUNT', placeholder:'P1000000'},
+};
+
+function selectMethod(el, method){
+  document.querySelectorAll('.method-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  selectedMethod = method;
+  updateWithdrawHint();
+}
+
+function updateWithdrawHint(){
+  const f = METHOD_FIELDS[selectedMethod] || METHOD_FIELDS.usdt;
+  const lbl = document.getElementById('txt-address-label');
+  const inp = document.getElementById('withdraw-address');
+  const hint = document.getElementById('txt-address-hint');
+  if(lbl) lbl.textContent = f.label;
+  if(inp) inp.placeholder = f.placeholder;
+  if(hint) hint.textContent = 'Enter your '+f.label.toLowerCase();
+  const amtHint = document.getElementById('withdraw-hint');
+  if(amtHint) amtHint.textContent = t('avail')+'$'+balance.toFixed(2)+' · '+t('min_withdraw');
+}
+
+function submitWithdraw(){
+  const amt = parseFloat(document.getElementById('withdraw-amount').value);
+  const addr = document.getElementById('withdraw-address').value.trim();
+  if(!addr || isNaN(amt) || amt <= 0){ showToast(t('fill_fields')); return; }
+  if(amt < 18){ showToast(t('min_withdraw')); return; }
+  if(amt > balance){ showToast(t('insufficient')); return; }
+
+  // Deduct and save
+  updateBalance(-amt);
+
+  const entry = {
+    id: Date.now(),
+    method: METHOD_LABELS[selectedMethod],
+    icon: METHOD_ICONS[selectedMethod],
+    amount: amt,
+    address: addr,
+    date: new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}),
+    status: 'processing',
+  };
+  withdrawHistory.unshift(entry);
+  save('cp_withdraw_history', withdrawHistory);
+
+  // Show processing card
+  const card = document.getElementById('processing-card');
+  card.style.display = 'block';
+  document.getElementById('proc-amount').textContent = '$'+amt.toFixed(2);
+  document.getElementById('txt-processing').textContent = t('processing');
+  document.getElementById('txt-proc-desc').textContent = t('proc_desc');
+
+  // Restore inner processing state
+  const inner = document.getElementById('proc-inner');
+  inner.innerHTML = `
+    <div class="proc-spinner" style="width:56px;height:56px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px"></div>
+    <div class="proc-amount" style="font-size:2.5rem;font-weight:800;color:var(--gold)">$${amt.toFixed(2)}</div>
+    <div style="font-size:1rem;font-weight:700;color:#f5a023;margin:6px 0">${t('processing')}</div>
+    <div style="font-size:.82rem;color:var(--muted)">${t('proc_desc')}</div>
+  `;
+  card.scrollIntoView({behavior:'smooth'});
+
+  document.getElementById('withdraw-amount').value = '';
+  document.getElementById('withdraw-address').value = '';
+  renderHistory();
+  showToast(t('req_submitted'));
+}
+
+function renderHistory(){
+  const list = document.getElementById('history-list');
+  if(!withdrawHistory.length){
+    list.innerHTML = `<div style="color:var(--muted);font-size:.8rem;padding:12px 0;text-align:center">${t('no_history')}</div>`;
+    return;
+  }
+  list.innerHTML = withdrawHistory.map(h=>{
+    const statusClass = h.status==='paid'?'paid':h.status==='processing'?'processing':'pending';
+    const statusLabel = h.status==='paid'?'Paid':h.status==='processing'?'Processing':'Pending';
+    const shortAddr = h.address.length>20 ? h.address.slice(0,10)+'...'+h.address.slice(-8) : h.address;
+    return `
+      <div class="history-item">
+        <div class="history-icon">${h.icon}</div>
+        <div class="history-info">
+          <div class="method">${h.method}</div>
+          <div class="date">${h.date}</div>
+          <div class="addr">${shortAddr}</div>
+        </div>
+        <div class="history-right">
+          <div class="history-amount">-$${h.amount.toFixed(2)}</div>
+          <div class="status-badge ${statusClass}">${statusLabel}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════════════════════
+function switchTab(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+  if(name==='withdraw'){ updateWithdrawHint(); renderHistory(); }
+}
+
+// ── SVG stroke fix for active tabs ──
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    document.querySelectorAll('.tab svg *').forEach(el=>el.removeAttribute('style'));
+    tab.querySelectorAll('svg *').forEach(el=>el.style.stroke=el.style.fill?'':'var(--gold)');
+  });
+});
+
+// ═══════════════════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════════════════
+let toastTimer;
+function showToast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>el.classList.remove('show'), 2800);
+}
+
+// ═══════════════════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════════════════
+if(lang){
+  selectedLang = lang;
+  document.getElementById('lang-screen').style.display = 'none';
+  startApp();
+} else {
+  buildLangScreen();
+}
+</script>
+</body>
+</html>
