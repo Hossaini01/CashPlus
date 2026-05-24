@@ -562,23 +562,7 @@ const I18N = {
 // Fallback to EN for missing langs
 ['es','ru','fr','hi','pt','tr','id'].forEach(c=>I18N[c]=I18N.en);
 
-// ── STORAGE HELPERS ──
-function save(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
-function load(k,def){try{const v=localStorage.getItem(k);return v!==null?JSON.parse(v):def}catch(e){return def}}
-
-// ── STATE ──
-let lang = load('cp_lang', null);
-let balance = load('cp_balance', 0);
-let adCount = load('cp_ads_today', 0);
-let adLastReset = load('cp_ads_reset', '');
-let adsTotalEarned = load('cp_ads_earned', 0);
-let completedTasks = load('cp_tasks', []);
-let inviteEarned = load('cp_invite_earned', 0);
-let inviteCount = load('cp_invite_count', 0);
-let withdrawHistory = load('cp_withdraw_history', []);
-let selectedMethod = 'usdt';
-
-// ── USER INFO ──
+// ── USER INFO (init first so storage keys include userId) ──
 let userId = '';
 let userName = 'User';
 let userPhoto = '';
@@ -591,10 +575,32 @@ function initUser(){
     if(u.last_name) userName += ' '+u.last_name;
     userPhoto = u.photo_url || '';
   } else {
-    userId = '123456789';
+    // fallback for browser testing — use a random id per session
+    userId = localStorage.getItem('cp_demo_uid') || String(Math.floor(Math.random()*9e8+1e8));
+    localStorage.setItem('cp_demo_uid', userId);
     userName = 'Demo User';
   }
 }
+
+// Call initUser immediately so userId is ready before any load()
+initUser();
+
+// ── STORAGE HELPERS (per-user keys) ──
+function ukey(k){ return 'cp_'+userId+'_'+k; }
+function save(k,v){try{localStorage.setItem(ukey(k),JSON.stringify(v))}catch(e){}}
+function load(k,def){try{const v=localStorage.getItem(ukey(k));return v!==null?JSON.parse(v):def}catch(e){return def}}
+
+// ── STATE ──
+let lang = load('lang', null);
+let balance = load('balance', 0);
+let adCount = load('ads_today', 0);
+let adLastReset = load('ads_reset', '');
+let adsTotalEarned = load('ads_earned', 0);
+let completedTasks = load('tasks', []);
+let inviteEarned = load('invite_earned', 0);
+let inviteCount = load('invite_count', 0);
+let withdrawHistory = load('withdraw_history', []);
+let selectedMethod = 'usdt';
 
 // ── AD DAILY RESET ──
 function checkAdReset(){
@@ -602,8 +608,8 @@ function checkAdReset(){
   if(adLastReset !== today){
     adCount = 0;
     adLastReset = today;
-    save('cp_ads_today', 0);
-    save('cp_ads_reset', today);
+    save('ads_today', 0);
+    save('ads_reset', today);
   }
 }
 
@@ -631,7 +637,7 @@ function buildLangScreen(){
 
 function confirmLang(){
   lang = selectedLang;
-  save('cp_lang', lang);
+  save('lang', lang);
   document.getElementById('lang-screen').style.display = 'none';
   startApp();
 }
@@ -675,7 +681,6 @@ function applyTranslations(){
 // ═══════════════════════════════════════════════════════
 function startApp(){
   checkAdReset();
-  initUser();
   applyTranslations();
   renderUserCard();
   renderTasks();
@@ -691,7 +696,7 @@ function startApp(){
     // override confirm to return back
     document.getElementById('lang-confirm').onclick = () => {
       lang = selectedLang;
-      save('cp_lang', lang);
+      save('lang', lang);
       document.getElementById('lang-screen').style.display = 'none';
       applyTranslations();
       renderTasks();
@@ -725,7 +730,7 @@ function renderUserCard(){
 
 function updateBalance(delta){
   balance = Math.max(0, balance + delta);
-  save('cp_balance', balance);
+  save('balance', balance);
   document.getElementById('user-balance').textContent = '$'+balance.toFixed(2);
 }
 
@@ -768,8 +773,8 @@ function watchAd(){
       loadingText.textContent = t('ad_done');
       adCount++;
       adsTotalEarned += AD_PER_VIEW;
-      save('cp_ads_today', adCount);
-      save('cp_ads_earned', adsTotalEarned);
+      save('ads_today', adCount);
+      save('ads_earned', adsTotalEarned);
       updateBalance(AD_PER_VIEW);
       updateAdUI();
       setTimeout(()=>{ overlay.classList.remove('show'); }, 1800);
@@ -792,8 +797,8 @@ function watchAd(){
         loadingText.textContent = t('ad_done');
         adCount++;
         adsTotalEarned += AD_PER_VIEW;
-        save('cp_ads_today', adCount);
-        save('cp_ads_earned', adsTotalEarned);
+        save('ads_today', adCount);
+        save('ads_earned', adsTotalEarned);
         updateBalance(AD_PER_VIEW);
         updateAdUI();
         setTimeout(()=>{ overlay.classList.remove('show'); }, 1800);
@@ -837,7 +842,7 @@ function renderTasks(){
         setTimeout(()=>{
           if(!completedTasks.includes(task.id)){
             completedTasks.push(task.id);
-            save('cp_tasks', completedTasks);
+            save('tasks', completedTasks);
             updateBalance(task.reward);
             renderTasks();
             showToast('+$'+task.reward.toFixed(2)+' added!');
@@ -935,7 +940,7 @@ function submitWithdraw(){
     status: 'processing',
   };
   withdrawHistory.unshift(entry);
-  save('cp_withdraw_history', withdrawHistory);
+  save('withdraw_history', withdrawHistory);
 
   // Show processing card
   const card = document.getElementById('processing-card');
