@@ -6,6 +6,24 @@
 <title>CashPlus – Rewards Center</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src='//libtl.com/sdk.js' data-zone='11052002' data-sdk='show_11052002'></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, get, set, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+  const firebaseConfig = {
+    apiKey:"AIzaSyAzdAtRTQO26-HSs72thRmDaGOeJrlvez4",
+    authDomain:"ali001-31d56.firebaseapp.com",
+    databaseURL:"https://ali001-31d56-default-rtdb.firebaseio.com",
+    projectId:"ali001-31d56",
+    storageBucket:"ali001-31d56.firebasestorage.app",
+    messagingSenderId:"433793508322",
+    appId:"1:433793508322:web:6348c8c99eb27ec6ae0fbb"
+  };
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
+  window._cpDb=db; window._cpRef=ref; window._cpGet=get; window._cpSet=set; window._cpUpd=update;
+  window._cpFirebaseReady=true;
+  document.dispatchEvent(new Event("cpFirebaseReady"));
+</script>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet"/>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -1162,60 +1180,111 @@ function showToast(msg){
 }
 
 // ═══════════════════════════════════════════════════════
-//  REFERRAL — reward the inviter when a new user joins
+//  REFERRAL — Firebase-based (same as MoneyPlus)
 // ═══════════════════════════════════════════════════════
-function handleReferral(){
-  // Get referrer ID from Telegram startapp param or URL
-  let referrerId = '';
+const INVITE_REWARD = 0.60;
 
-  // 1) From Telegram WebApp initData (most reliable)
+function getReferrerId(){
   try {
     const raw = TG?.initDataUnsafe?.start_param || '';
-    if(raw && /^\d+$/.test(raw)) referrerId = raw;
+    if(raw && /^\d+$/.test(raw)) return raw;
   } catch(e){}
+  const urlParams = new URLSearchParams(window.location.search);
+  const fromUrl = urlParams.get('startapp') || urlParams.get('start') || '';
+  if(fromUrl && /^\d+$/.test(fromUrl)) return fromUrl;
+  return '';
+}
 
-  // 2) Fallback: from URL ?startapp= or #startapp=
-  if(!referrerId){
-    const urlParams = new URLSearchParams(window.location.search);
-    referrerId = urlParams.get('startapp') || urlParams.get('start') || '';
-    if(!referrerId){
-      const hash = window.location.hash.replace('#','');
-      const hp = new URLSearchParams(hash);
-      referrerId = hp.get('startapp') || hp.get('start') || '';
-    }
-  }
-
-  // Must be a valid numeric ID, different from current user, and not already processed
-  if(!referrerId || !/^\d+$/.test(referrerId)) return;
-  if(referrerId === userId) return; // can't invite yourself
-  if(load('referral_done', false)) return; // already rewarded this user
-
-  // Mark this user as referred (so we don't double-reward)
-  save('referral_done', true);
-  save('referral_by', referrerId);
-
-  // ── Reward the referrer ──
-  const INVITE_REWARD = 0.60;
-  const refKey_bal     = 'cp_' + referrerId + '_balance';
-  const refKey_earned  = 'cp_' + referrerId + '_invite_earned';
-  const refKey_count   = 'cp_' + referrerId + '_invite_count';
-
+async function creditReferrer(refId){
+  if(!refId || refId === userId) return;
+  if(!window._cpFirebaseReady || !window._cpDb) return;
   try {
-    const curBal    = parseFloat(localStorage.getItem(refKey_bal)     ? JSON.parse(localStorage.getItem(refKey_bal))    : 0) || 0;
-    const curEarned = parseFloat(localStorage.getItem(refKey_earned)  ? JSON.parse(localStorage.getItem(refKey_earned)) : 0) || 0;
-    const curCount  = parseInt(  localStorage.getItem(refKey_count)   ? JSON.parse(localStorage.getItem(refKey_count))  : 0) || 0;
+    const db = window._cpDb;
+    const refSnap = await window._cpGet(window._cpRef(db, 'cp_users/' + refId));
+    if(refSnap.exists()){
+      const d = refSnap.val();
+      await window._cpUpd(window._cpRef(db, 'cp_users/' + refId), {
+        balance:      +((d.balance      || 0) + INVITE_REWARD).toFixed(2),
+        inviteCount:   (d.inviteCount   || 0) + 1,
+        inviteEarned: +((d.inviteEarned || 0) + INVITE_REWARD).toFixed(2),
+      });
+    } else {
+      // referrer not in Firebase yet — create a minimal record
+      await window._cpSet(window._cpRef(db, 'cp_users/' + refId), {
+        balance: INVITE_REWARD,
+        inviteCount: 1,
+        inviteEarned: INVITE_REWARD,
+      });
+    }
+    console.log('Referrer credited:', refId, '+$' + INVITE_REWARD);
+  } catch(e){ console.error('creditReferrer error:', e); }
+}
 
-    localStorage.setItem(refKey_bal,    JSON.stringify(parseFloat((curBal + INVITE_REWARD).toFixed(2))));
-    localStorage.setItem(refKey_earned, JSON.stringify(parseFloat((curEarned + INVITE_REWARD).toFixed(2))));
-    localStorage.setItem(refKey_count,  JSON.stringify(curCount + 1));
-  } catch(e){}
+async function handleReferral(){
+  const refId = getReferrerId();
+  if(!refId || refId === userId) return;
+  if(load('referral_done', false)) return; // already processed
+
+  save('referral_done', true);
+  save('referral_by', refId);
+
+  // Wait for Firebase if not ready yet
+  if(!window._cpFirebaseReady){
+    document.addEventListener('cpFirebaseReady', () => creditReferrer(refId), { once:true });
+  } else {
+    await creditReferrer(refId);
+  }
+}
+
+// Also sync this user's invite stats FROM Firebase on load
+async function syncInviteFromFirebase(){
+  if(!window._cpFirebaseReady || !window._cpDb || !userId) return;
+  try {
+    const snap = await window._cpGet(window._cpRef(window._cpDb, 'cp_users/' + userId));
+    if(snap.exists()){
+      const d = snap.val();
+      // Merge Firebase invite data with local — take the higher value
+      if((d.inviteCount || 0) > inviteCount){
+        inviteCount = d.inviteCount;
+        save('invite_count', inviteCount);
+      }
+      if((d.inviteEarned || 0) > inviteEarned){
+        inviteEarned = d.inviteEarned;
+        save('invite_earned', inviteEarned);
+        // also add the difference to local balance
+        const diff = +((d.inviteEarned || 0) - inviteEarned).toFixed(2);
+        if(diff > 0) updateBalance(diff);
+      }
+      if((d.balance || 0) > balance){
+        balance = d.balance;
+        save('balance', balance);
+        document.getElementById('user-balance').textContent = '$'+balance.toFixed(2);
+      }
+      renderInvite();
+    } else {
+      // Save this user's current data to Firebase
+      await window._cpSet(window._cpRef(window._cpDb, 'cp_users/' + userId), {
+        balance, inviteCount, inviteEarned
+      });
+    }
+  } catch(e){ console.error('syncInvite error:', e); }
 }
 
 // ═══════════════════════════════════════════════════════
 //  BOOT
 // ═══════════════════════════════════════════════════════
-// handleReferral runs after initUser (userId is already set)
-handleReferral();
+
+// Run referral + sync after Firebase is ready
+function runFirebaseInit(){
+  handleReferral();
+  syncInviteFromFirebase();
+}
+
+if(window._cpFirebaseReady){
+  runFirebaseInit();
+} else {
+  document.addEventListener('cpFirebaseReady', runFirebaseInit, { once:true });
+}
 
 if(lang){
   selectedLang = lang;
