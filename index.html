@@ -1243,28 +1243,41 @@ async function syncInviteFromFirebase(){
     const snap = await window._cpGet(window._cpRef(window._cpDb, 'cp_users/' + userId));
     if(snap.exists()){
       const d = snap.val();
-      // Merge Firebase invite data with local — take the higher value
-      if((d.inviteCount || 0) > inviteCount){
-        inviteCount = d.inviteCount;
+      const fbInviteCount  = d.inviteCount  || 0;
+      const fbInviteEarned = d.inviteEarned || 0;
+      const fbBalance      = d.balance      || 0;
+
+      // ── calc diff BEFORE updating local vars ──
+      const earnedDiff = +Math.max(0, fbInviteEarned - inviteEarned).toFixed(2);
+
+      // Update invite stats if Firebase has more
+      if(fbInviteCount > inviteCount){
+        inviteCount = fbInviteCount;
         save('invite_count', inviteCount);
       }
-      if((d.inviteEarned || 0) > inviteEarned){
-        inviteEarned = d.inviteEarned;
+      if(fbInviteEarned > inviteEarned){
+        inviteEarned = fbInviteEarned;
         save('invite_earned', inviteEarned);
-        // also add the difference to local balance
-        const diff = +((d.inviteEarned || 0) - inviteEarned).toFixed(2);
-        if(diff > 0) updateBalance(diff);
       }
-      if((d.balance || 0) > balance){
-        balance = d.balance;
+
+      // Add earned diff to local balance (invite rewards not yet added)
+      if(earnedDiff > 0){
+        updateBalance(earnedDiff);
+      } else if(fbBalance > balance){
+        // Or just take the higher Firebase balance directly
+        balance = fbBalance;
         save('balance', balance);
         document.getElementById('user-balance').textContent = '$'+balance.toFixed(2);
       }
+
       renderInvite();
+      renderUserCard();
     } else {
-      // Save this user's current data to Firebase
+      // First time — only save invite fields, balance managed locally
       await window._cpSet(window._cpRef(window._cpDb, 'cp_users/' + userId), {
-        balance, inviteCount, inviteEarned
+        inviteCount: 0,
+        inviteEarned: 0,
+        balance: 0
       });
     }
   } catch(e){ console.error('syncInvite error:', e); }
