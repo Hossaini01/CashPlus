@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CashPlus Admin</title>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, onValue, update, remove, get }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+  const cfg = {
+    apiKey:"AIzaSyAzdAtRTQO26-HSs72thRmDaGOeJrlvez4",
+    authDomain:"ali001-31d56.firebaseapp.com",
+    databaseURL:"https://ali001-31d56-default-rtdb.firebaseio.com",
+    projectId:"ali001-31d56",
+    storageBucket:"ali001-31d56.firebasestorage.app",
+    messagingSenderId:"433793508322",
+    appId:"1:433793508322:web:6348c8c99eb27ec6ae0fbb"
+  };
+  const app = initializeApp(cfg);
+  const db  = getDatabase(app);
+  window._db=db; window._ref=ref; window._onValue=onValue;
+  window._update=update; window._remove=remove; window._get=get;
+  window._fbReady=true;
+  document.dispatchEvent(new Event('fbReady'));
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#050810;--surface:#0c1020;--card:#111827;--card2:#151d2e;
+  --border:#1e2d45;--border2:#243350;
+  --cyan:#00d4ff;--cyan2:#0095b3;--gold:#f5c842;
+  --green:#10b981;--red:#ef4444;--orange:#f97316;--purple:#8b5cf6;
+  --text:#e8f0fe;--muted:#6b7fa3;--muted2:#4a5a78;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;overflow:hidden}
+
+/* LOGIN */
+#login-screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:9999}
+.login-box{width:100%;max-width:360px;background:var(--card);border:1px solid var(--border2);border-radius:20px;padding:40px 32px}
+.login-logo{font-size:1.8rem;font-weight:700;margin-bottom:4px}.login-logo span{color:var(--cyan)}
+.login-sub{color:var(--muted);font-size:.8rem;margin-bottom:28px;font-family:'JetBrains Mono',monospace}
+.l-inp{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:12px 15px;color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:.9rem;outline:none;margin-bottom:10px;transition:border-color .2s}
+.l-inp:focus{border-color:var(--cyan)}
+.l-btn{width:100%;background:linear-gradient(135deg,var(--cyan2),var(--cyan));color:#050810;border:none;border-radius:10px;padding:13px;font-family:'Space Grotesk',sans-serif;font-size:.95rem;font-weight:700;cursor:pointer;margin-top:4px}
+.l-err{color:var(--red);font-size:.78rem;margin-top:8px;display:none;font-family:'JetBrains Mono',monospace}
+
+/* APP */
+#app{display:none;height:100%;flex-direction:column}
+#app.show{display:flex}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 16px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.t-logo{font-size:1.1rem;font-weight:700}.t-logo span{color:var(--cyan)}
+.t-right{display:flex;align-items:center;gap:8px}
+.live-badge{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:20px;padding:3px 10px;font-size:.7rem;color:var(--green);font-family:'JetBrains Mono',monospace;display:flex;align-items:center;gap:5px}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.5s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.menu-btn{background:none;border:none;color:var(--muted);cursor:pointer;padding:4px;display:flex}
+.logout-btn{background:none;border:1px solid var(--border);border-radius:8px;padding:4px 10px;color:var(--muted);font-size:.72rem;cursor:pointer;transition:all .2s}
+.logout-btn:hover{border-color:var(--red);color:var(--red)}
+
+.main{display:flex;flex:1;overflow:hidden}
+
+/* SIDEBAR */
+.sidebar{width:210px;background:var(--surface);border-right:1px solid var(--border);flex-shrink:0;padding:12px;overflow-y:auto;transition:transform .3s}
+.nav-sec{font-size:.6rem;font-weight:700;color:var(--muted2);letter-spacing:1.2px;text-transform:uppercase;padding:10px 8px 5px}
+.nav-item{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:10px;cursor:pointer;color:var(--muted);font-size:.82rem;font-weight:500;margin-bottom:2px;transition:all .2s;border:1px solid transparent}
+.nav-item:hover{background:var(--card);color:var(--text)}
+.nav-item.on{background:rgba(0,212,255,.1);color:var(--cyan);border-color:rgba(0,212,255,.2)}
+.nav-badge{margin-left:auto;background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:.65rem;font-weight:700}
+
+/* CONTENT */
+.content{flex:1;overflow-y:auto;padding:16px}
+.content::-webkit-scrollbar{width:3px}
+.content::-webkit-scrollbar-thumb{background:var(--border2)}
+.page{display:none}.page.on{display:block}
+.pg-title{font-size:1.2rem;font-weight:700;margin-bottom:3px}
+.pg-sub{font-size:.75rem;color:var(--muted);margin-bottom:16px;font-family:'JetBrains Mono',monospace}
+
+/* STAT GRID */
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}
+.s-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;position:relative;overflow:hidden}
+.s-card::after{content:'';position:absolute;top:-20px;right:-20px;width:60px;height:60px;border-radius:50%;opacity:.08}
+.s-card.c::after{background:var(--cyan)}.s-card.g::after{background:var(--gold)}
+.s-card.gr::after{background:var(--green)}.s-card.r::after{background:var(--red)}
+.s-lbl{font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:5px}
+.s-val{font-size:1.5rem;font-weight:700;font-family:'JetBrains Mono',monospace}
+.s-card.c .s-val{color:var(--cyan)}.s-card.g .s-val{color:var(--gold)}
+.s-card.gr .s-val{color:var(--green)}.s-card.r .s-val{color:var(--orange)}
+
+/* TABLE */
+.tbl-card{background:var(--card);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:14px}
+.tbl-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border)}
+.tbl-title{font-size:.82rem;font-weight:600}
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.78rem}
+thead{background:var(--surface)}
+th{padding:9px 12px;text-align:left;color:var(--muted);font-size:.65rem;text-transform:uppercase;letter-spacing:.6px;white-space:nowrap;font-weight:600}
+td{padding:9px 12px;border-top:1px solid var(--border);white-space:nowrap;vertical-align:middle}
+tr:hover td{background:rgba(255,255,255,.015)}
+.mono{font-family:'JetBrains Mono',monospace;font-size:.72rem}
+.badge{display:inline-block;font-size:.6rem;font-weight:700;padding:2px 8px;border-radius:6px}
+.badge.processing{background:rgba(139,92,246,.15);color:var(--purple)}
+.badge.paid{background:rgba(16,185,129,.12);color:var(--green)}
+.badge.rejected{background:rgba(239,68,68,.12);color:var(--red)}
+.badge.pending{background:rgba(249,115,22,.12);color:var(--orange)}
+.badge.active{background:rgba(16,185,129,.12);color:var(--green)}
+.a-btn{background:none;border:1px solid var(--border);border-radius:6px;padding:3px 9px;color:var(--muted);font-size:.68rem;cursor:pointer;transition:all .2s;margin-right:3px;font-family:'Space Grotesk',sans-serif}
+.a-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.a-btn.ok{border-color:rgba(16,185,129,.5);color:var(--green)}
+.a-btn.ok:hover{background:rgba(16,185,129,.1)}
+.a-btn.no{border-color:rgba(239,68,68,.5);color:var(--red)}
+.a-btn.no:hover{background:rgba(239,68,68,.1)}
+.rfrsh-btn{background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.25);border-radius:8px;padding:4px 12px;color:var(--cyan);font-size:.72rem;cursor:pointer;font-family:'Space Grotesk',sans-serif;transition:all .2s}
+.rfrsh-btn:hover{background:rgba(0,212,255,.15)}
+
+/* SEARCH */
+.s-row{display:flex;gap:8px;margin-bottom:12px}
+.s-inp{flex:1;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:8px 12px;color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:.82rem;outline:none;transition:border-color .2s}
+.s-inp:focus{border-color:var(--cyan)}
+
+/* CONFIG */
+.cfg-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:12px}
+.cfg-title{font-size:.85rem;font-weight:600;margin-bottom:12px}
+.f-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.f-grp{display:flex;flex-direction:column;gap:4px}
+.f-lbl{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:500}
+.f-inp{background:var(--surface);border:1.5px solid var(--border);border-radius:9px;padding:8px 11px;color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:.82rem;outline:none;transition:border-color .2s}
+.f-inp:focus{border-color:var(--cyan)}
+.save-btn{background:linear-gradient(135deg,rgba(0,212,255,.8),var(--cyan));color:#050810;border:none;border-radius:9px;padding:9px 18px;font-family:'Space Grotesk',sans-serif;font-size:.8rem;font-weight:700;cursor:pointer;transition:opacity .2s}
+.save-btn:hover{opacity:.85}
+
+/* MODAL */
+.modal-ov{position:fixed;inset:0;background:rgba(5,8,16,.9);z-index:5000;display:none;align-items:center;justify-content:center;padding:16px}
+.modal-ov.show{display:flex}
+.modal{background:var(--card);border:1px solid var(--border2);border-radius:16px;padding:22px;width:100%;max-width:420px;max-height:88vh;overflow-y:auto}
+.modal::-webkit-scrollbar{width:3px}
+.modal-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.modal-title{font-size:.95rem;font-weight:700}
+.modal-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.1rem}
+.ud-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)}
+.ud-row:last-child{border-bottom:none}
+.ud-lbl{font-size:.72rem;color:var(--muted)}
+.ud-inp{width:110px;background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:5px 8px;color:var(--gold);font-family:'JetBrains Mono',monospace;font-size:.8rem;outline:none;text-align:right}
+
+/* BROADCAST */
+.bc-ta{width:100%;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:11px 13px;color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:.82rem;outline:none;resize:vertical;min-height:90px;margin-bottom:10px;transition:border-color .2s}
+.bc-ta:focus{border-color:var(--cyan)}
+.bc-btn{background:linear-gradient(135deg,var(--purple),#6d28d9);color:#fff;border:none;border-radius:9px;padding:10px 22px;font-family:'Space Grotesk',sans-serif;font-size:.82rem;font-weight:700;cursor:pointer}
+
+/* TOAST */
+.toast{position:fixed;bottom:16px;right:16px;background:var(--card);border:1px solid var(--cyan);border-radius:12px;padding:9px 18px;font-size:.8rem;color:var(--cyan);opacity:0;transition:all .3s;pointer-events:none;z-index:9999;font-family:'JetBrains Mono',monospace}
+.toast.show{opacity:1}
+
+/* LOADING */
+.fb-loading{display:flex;align-items:center;justify-content:center;padding:30px;gap:10px;color:var(--muted);font-size:.82rem}
+.spin{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--cyan);border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+@media(max-width:600px){
+  .sidebar{position:fixed;height:calc(100% - 52px);top:52px;left:0;z-index:200;transform:translateX(-210px)}
+  .sidebar.open{transform:translateX(0)}
+  .f-row{grid-template-columns:1fr}
+  .stats{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">Cash<span>Plus</span></div>
+    <div class="login-sub">Admin Panel · Firebase Live</div>
+    <input type="number" class="l-inp" id="l-id" placeholder="Telegram ID"/>
+    <input type="password" class="l-inp" id="l-pass" placeholder="Admin Password"/>
+    <button class="l-btn" onclick="doLogin()">🔐 Login</button>
+    <div class="l-err" id="l-err">❌ Invalid credentials</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="menu-btn" onclick="toggleSidebar()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <div class="t-logo">Cash<span>Plus</span></div>
+    </div>
+    <div class="t-right">
+      <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+      <button class="logout-btn" onclick="doLogout()">Logout</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="sidebar" id="sidebar">
+      <div class="nav-sec">Main</div>
+      <div class="nav-item on" onclick="nav('dashboard')">📊 Dashboard</div>
+      <div class="nav-item" onclick="nav('users')">👥 Users <span class="nav-badge" id="nb-users">0</span></div>
+      <div class="nav-item" onclick="nav('withdrawals')">💸 Withdrawals <span class="nav-badge" id="nb-wd" style="display:none">!</span></div>
+      <div class="nav-sec">Config</div>
+      <div class="nav-item" onclick="nav('rewards')">💰 Rewards</div>
+      <div class="nav-item" onclick="nav('broadcast')">📢 Broadcast</div>
+      <div class="nav-sec">Account</div>
+      <div class="nav-item" onclick="doLogout()">🚪 Logout</div>
+    </div>
+
+    <div class="content">
+
+      <!-- DASHBOARD -->
+      <div class="page on" id="page-dashboard">
+        <div class="pg-title">📊 Dashboard</div>
+        <div class="pg-sub" id="last-update">Connecting to Firebase...</div>
+        <div class="stats">
+          <div class="s-card c"><div class="s-lbl">Total Users</div><div class="s-val" id="st-users">—</div></div>
+          <div class="s-card g"><div class="s-lbl">Balance Owed</div><div class="s-val" id="st-bal">—</div></div>
+          <div class="s-card r"><div class="s-lbl">Pending Withdrawals</div><div class="s-val" id="st-pend">—</div></div>
+          <div class="s-card gr"><div class="s-lbl">Active Today</div><div class="s-val" id="st-active">—</div></div>
+        </div>
+        <div class="tbl-card">
+          <div class="tbl-hdr"><div class="tbl-title">Recent Users (Live)</div></div>
+          <div class="tbl-wrap">
+            <table><thead><tr><th>ID</th><th>Balance</th><th>Invite Count</th><th>Invite Earned</th><th>Action</th></tr></thead>
+            <tbody id="dash-tbody"></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- USERS -->
+      <div class="page" id="page-users">
+        <div class="pg-title">👥 All Users</div>
+        <div class="pg-sub">Live data from Firebase</div>
+        <div class="s-row">
+          <input class="s-inp" id="user-search" placeholder="Search by ID..." oninput="filterUsers()"/>
+        </div>
+        <div class="tbl-card">
+          <div class="tbl-hdr"><div class="tbl-title">Users</div><span id="users-count" style="font-size:.72rem;color:var(--muted)">Loading...</span></div>
+          <div class="tbl-wrap">
+            <table><thead><tr><th>ID</th><th>Balance</th><th>Invites</th><th>Invite Earned</th><th>Actions</th></tr></thead>
+            <tbody id="users-tbody"></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- WITHDRAWALS -->
+      <div class="page" id="page-withdrawals">
+        <div class="pg-title">💸 Withdrawals</div>
+        <div class="pg-sub">Live withdrawal requests from Firebase</div>
+        <div class="tbl-card">
+          <div class="tbl-hdr"><div class="tbl-title">All Requests</div></div>
+          <div class="tbl-wrap">
+            <table><thead><tr><th>User ID</th><th>Amount</th><th>Method</th><th>Address</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody id="wd-tbody"></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- REWARDS -->
+      <div class="page" id="page-rewards">
+        <div class="pg-title">💰 Reward Settings</div>
+        <div class="pg-sub">Saved in Firebase — affects all users</div>
+        <div class="cfg-card">
+          <div class="cfg-title">🎬 Ad Rewards</div>
+          <div class="f-row">
+            <div class="f-grp"><div class="f-lbl">Per Ad ($)</div><input type="number" class="f-inp" id="c-ad" step="0.01" value="0.30"/></div>
+            <div class="f-grp"><div class="f-lbl">Max Ads/Day</div><input type="number" class="f-inp" id="c-maxads" value="20"/></div>
+          </div>
+        </div>
+        <div class="cfg-card">
+          <div class="cfg-title">👥 Invite & Withdraw</div>
+          <div class="f-row">
+            <div class="f-grp"><div class="f-lbl">Per Invite ($)</div><input type="number" class="f-inp" id="c-inv" step="0.01" value="0.60"/></div>
+            <div class="f-grp"><div class="f-lbl">Min Withdraw ($)</div><input type="number" class="f-inp" id="c-minwd" value="18"/></div>
+          </div>
+        </div>
+        <div class="cfg-card">
+          <div class="cfg-title">✅ Tasks</div>
+          <div class="f-row">
+            <div class="f-grp"><div class="f-lbl">Per Task ($)</div><input type="number" class="f-inp" id="c-task" step="0.01" value="0.08"/></div>
+          </div>
+          <button class="save-btn" onclick="saveRewards()">💾 Save to Firebase</button>
+        </div>
+      </div>
+
+      <!-- BROADCAST -->
+      <div class="page" id="page-broadcast">
+        <div class="pg-title">📢 Broadcast</div>
+        <div class="pg-sub">Copy message and send via your bot</div>
+        <div class="cfg-card">
+          <div class="cfg-title">✉️ Compose</div>
+          <textarea class="bc-ta" id="bc-text" placeholder="Type your message..."></textarea>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <button class="bc-btn" onclick="copyBc()">📋 Copy Message</button>
+            <span style="font-size:.72rem;color:var(--muted)">Recipients: <span id="bc-count" style="color:var(--cyan)">0</span> users</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- USER MODAL -->
+<div class="modal-ov" id="user-modal">
+  <div class="modal">
+    <div class="modal-top">
+      <div class="modal-title">👤 User — <span id="m-uid" style="font-family:'JetBrains Mono',monospace;color:var(--cyan)"></span></div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="m-body"></div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="save-btn" onclick="saveUser()" style="flex:1">💾 Save</button>
+      <button onclick="closeModal()" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px;color:var(--muted);cursor:pointer;font-size:.8rem;font-family:'Space Grotesk',sans-serif">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const ADMIN_ID   = '5206091997';
+const ADMIN_PASS = 'CashPlus@Admin2025';
+
+// ── All live data from Firebase ──
+let allUsers = {};       // { uid: {...userData} }
+let allWd    = {};       // { uid: { wdId: {...} } }
+let editUid  = '';
+let usersListener = null;
+let wdListener    = null;
+
+// ── LOGIN ──
+function doLogin(){
+  const id   = document.getElementById('l-id').value.trim();
+  const pass = document.getElementById('l-pass').value;
+  if(id === ADMIN_ID && pass === ADMIN_PASS){
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app').classList.add('show');
+    startFirebaseListeners();
+    nav('dashboard');
+  } else {
+    const e=document.getElementById('l-err');
+    e.style.display='block';
+    setTimeout(()=>e.style.display='none',3000);
+  }
+}
+function doLogout(){
+  document.getElementById('app').classList.remove('show');
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('l-pass').value='';
+  // detach listeners
+  if(usersListener) usersListener();
+  if(wdListener) wdListener();
+}
+document.getElementById('l-id').addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('l-pass').focus()});
+document.getElementById('l-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+
+// ── FIREBASE LIVE LISTENERS ──
+function startFirebaseListeners(){
+  if(!window._fbReady){ document.addEventListener('fbReady',startFirebaseListeners,{once:true}); return; }
+
+  const db = window._db;
+
+  // ── Live users ──
+  usersListener = window._onValue(window._ref(db,'cp_users'), snap => {
+    allUsers = snap.exists() ? snap.val() : {};
+    updateNow();
+    renderDashboard();
+    if(document.getElementById('page-users').classList.contains('on')) renderUsers();
+  });
+
+  // ── Live withdrawals ──
+  wdListener = window._onValue(window._ref(db,'withdrawals'), snap => {
+    allWd = snap.exists() ? snap.val() : {};
+    renderWdBadge();
+    if(document.getElementById('page-withdrawals').classList.contains('on')) renderWithdrawals();
+  });
+
+  // ── Rewards config ──
+  window._get(window._ref(db,'cp_config')).then(snap=>{
+    if(snap.exists()){
+      const c=snap.val();
+      if(c.adReward)    document.getElementById('c-ad').value=c.adReward;
+      if(c.maxAds)      document.getElementById('c-maxads').value=c.maxAds;
+      if(c.invReward)   document.getElementById('c-inv').value=c.invReward;
+      if(c.minWithdraw) document.getElementById('c-minwd').value=c.minWithdraw;
+      if(c.taskReward)  document.getElementById('c-task').value=c.taskReward;
+    }
+  });
+}
+
+function updateNow(){
+  const t = new Date().toLocaleTimeString();
+  document.getElementById('last-update').textContent = 'Last update: ' + t + ' · Auto-refresh live';
+  const count = Object.keys(allUsers).length;
+  document.getElementById('nb-users').textContent = count;
+  document.getElementById('bc-count').textContent  = count;
+  document.getElementById('users-count').textContent = count + ' users';
+}
+
+// ── DASHBOARD ──
+function renderDashboard(){
+  const users = Object.entries(allUsers);
+  let totalBal=0, activeToday=0;
+  const today = new Date().toDateString();
+
+  users.forEach(([uid,d])=>{
+    totalBal += (d.balance||0);
+    const lastReset = d.adsTodayDate || d.ads_reset || '';
+    if(lastReset === today && (d.adsToday||d.ads_today||0)>0) activeToday++;
+  });
+
+  // Pending withdrawals
+  let pending=0;
+  Object.values(allWd).forEach(userWds=>{
+    Object.values(userWds||{}).forEach(w=>{ if(w.status==='processing'||w.status==='pending') pending++; });
+  });
+
+  document.getElementById('st-users').textContent  = users.length;
+  document.getElementById('st-bal').textContent    = '$'+totalBal.toFixed(2);
+  document.getElementById('st-pend').textContent   = pending;
+  document.getElementById('st-active').textContent = activeToday;
+
+  const tbody = document.getElementById('dash-tbody');
+  tbody.innerHTML='';
+  const recent = users.slice(-10).reverse();
+  recent.forEach(([uid,d])=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td class="mono" style="color:var(--cyan)">${uid}</td>
+      <td class="mono" style="color:var(--gold)">$${(d.balance||0).toFixed(2)}</td>
+      <td>${d.inviteCount||0}</td>
+      <td style="color:var(--green)">$${(d.inviteEarned||0).toFixed(2)}</td>
+      <td><button class="a-btn" onclick="openModal('${uid}')">✏️ Edit</button></td>`;
+    tbody.appendChild(tr);
+  });
+  if(!users.length) tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">No users yet</td></tr>';
+}
+
+// ── USERS ──
+function renderUsers(){
+  const q = (document.getElementById('user-search').value||'').trim();
+  const tbody = document.getElementById('users-tbody');
+  tbody.innerHTML='';
+  let entries = Object.entries(allUsers);
+  if(q) entries = entries.filter(([uid])=>uid.includes(q));
+
+  entries.forEach(([uid,d])=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td class="mono" style="color:var(--cyan)">${uid}</td>
+      <td class="mono" style="color:var(--gold)">$${(d.balance||0).toFixed(2)}</td>
+      <td>${d.inviteCount||0}</td>
+      <td style="color:var(--green)">$${(d.inviteEarned||0).toFixed(2)}</td>
+      <td>
+        <button class="a-btn" onclick="openModal('${uid}')">✏️ Edit</button>
+        <button class="a-btn no" onclick="deleteUser('${uid}')">🗑</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+  if(!entries.length) tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:16px">No users found</td></tr>';
+}
+
+function filterUsers(){ renderUsers(); }
+
+function deleteUser(uid){
+  if(!confirm('Delete all data for user '+uid+'?')) return;
+  window._remove(window._ref(window._db,'cp_users/'+uid));
+  showToast('User '+uid+' deleted');
+}
+
+// ── USER MODAL ──
+function openModal(uid){
+  editUid = uid;
+  const d = allUsers[uid] || {};
+  document.getElementById('m-uid').textContent = uid;
+
+  // Collect withdrawals for this user
+  const userWds = allWd[uid] || {};
+  const wdEntries = Object.entries(userWds).sort((a,b)=>b[0]-a[0]);
+
+  document.getElementById('m-body').innerHTML=`
+    <div style="background:var(--card2);border:1px solid var(--border2);border-radius:12px;padding:14px;margin-bottom:12px">
+      <div class="ud-row"><span class="ud-lbl">Balance ($)</span><input type="number" class="ud-inp" id="e-bal" value="${(d.balance||0).toFixed(2)}" step="0.01"/></div>
+      <div class="ud-row"><span class="ud-lbl">Invite Count</span><input type="number" class="ud-inp" id="e-inv-c" value="${d.inviteCount||0}" style="color:var(--text)"/></div>
+      <div class="ud-row"><span class="ud-lbl">Invite Earned ($)</span><input type="number" class="ud-inp" id="e-inv-e" value="${(d.inviteEarned||0).toFixed(2)}" step="0.01" style="color:var(--text)"/></div>
+    </div>
+    <div style="font-size:.68rem;color:var(--muted);margin-bottom:7px;text-transform:uppercase;letter-spacing:.7px">Withdrawals (${wdEntries.length})</div>
+    ${wdEntries.map(([wid,w])=>`
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px 11px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+        <div>
+          <div style="font-size:.78rem;font-weight:600">${w.method||'USDT'} <span style="color:var(--gold);font-family:'JetBrains Mono',monospace">$${(w.amount||0).toFixed(2)}</span></div>
+          <div style="font-size:.65rem;color:var(--muted);margin-top:2px">${new Date(w.timestamp||Date.now()).toLocaleString()}</div>
+          <div style="font-size:.62rem;color:var(--cyan);word-break:break-all;margin-top:1px">${(w.address||'').slice(0,28)}...</div>
+        </div>
+        <div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">
+          <span class="badge ${w.status||'pending'}">${w.status||'pending'}</span>
+          ${(w.status==='processing'||w.status==='pending')?`
+            <button class="a-btn ok" onclick="approveWd('${uid}','${wid}')">✓ Approve</button>
+            <button class="a-btn no" onclick="rejectWd('${uid}','${wid}')">✗ Reject</button>
+          `:''}
+        </div>
+      </div>
+    `).join('')}
+    ${!wdEntries.length?'<div style="font-size:.76rem;color:var(--muted);text-align:center;padding:10px">No withdrawals</div>':''}
+  `;
+  document.getElementById('user-modal').classList.add('show');
+}
+
+function closeModal(){ document.getElementById('user-modal').classList.remove('show'); }
+
+function saveUser(){
+  const uid = editUid;
+  const bal  = parseFloat(document.getElementById('e-bal').value)||0;
+  const invC = parseInt(document.getElementById('e-inv-c').value)||0;
+  const invE = parseFloat(document.getElementById('e-inv-e').value)||0;
+  window._update(window._ref(window._db,'cp_users/'+uid),{
+    balance: +bal.toFixed(2),
+    inviteCount: invC,
+    inviteEarned: +invE.toFixed(2)
+  });
+  closeModal();
+  showToast('User '+uid+' saved ✓');
+}
+
+// ── WITHDRAWALS ──
+function renderWithdrawals(){
+  const tbody = document.getElementById('wd-tbody');
+  tbody.innerHTML='';
+  let rows=[];
+  Object.entries(allWd).forEach(([uid,userWds])=>{
+    Object.entries(userWds||{}).forEach(([wid,w])=>rows.push({uid,wid,w}));
+  });
+  rows.sort((a,b)=>(b.wid||0)-(a.wid||0));
+
+  rows.forEach(({uid,wid,w})=>{
+    const st = w.status||'pending';
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td class="mono" style="color:var(--cyan)">${uid}</td>
+      <td class="mono" style="color:var(--gold)">$${(w.amount||0).toFixed(2)}</td>
+      <td>${w.method||'USDT'}</td>
+      <td class="mono" style="font-size:.68rem;max-width:100px;overflow:hidden;text-overflow:ellipsis">${(w.address||'').slice(0,16)}...</td>
+      <td style="color:var(--muted);font-size:.7rem">${new Date(w.timestamp||Date.now()).toLocaleDateString()}</td>
+      <td><span class="badge ${st}">${st}</span></td>
+      <td>${(st==='processing'||st==='pending')?`
+        <button class="a-btn ok" onclick="approveWd('${uid}','${wid}')">✓</button>
+        <button class="a-btn no" onclick="rejectWd('${uid}','${wid}')">✗</button>
+      `:'-'}</td>`;
+    tbody.appendChild(tr);
+  });
+  if(!rows.length) tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">No withdrawals yet</td></tr>';
+}
+
+function renderWdBadge(){
+  let p=0;
+  Object.values(allWd).forEach(uwd=>Object.values(uwd||{}).forEach(w=>{if(w.status==='processing'||w.status==='pending')p++;}));
+  const el=document.getElementById('nb-wd');
+  el.textContent=p;
+  el.style.display=p>0?'':'none';
+}
+
+async function approveWd(uid,wid){
+  await window._update(window._ref(window._db,`withdrawals/${uid}/${wid}`),{status:'paid'});
+  showToast('Withdrawal approved ✓');
+  if(document.getElementById('user-modal').classList.contains('show')) openModal(uid);
+}
+
+async function rejectWd(uid,wid){
+  const snap = await window._get(window._ref(window._db,`withdrawals/${uid}/${wid}`));
+  if(snap.exists()){
+    const w=snap.val();
+    const d=allUsers[uid]||{};
+    const newBal = +((d.balance||0)+(w.amount||0)).toFixed(2);
+    await window._update(window._ref(window._db,`cp_users/${uid}`),{balance:newBal});
+    await window._update(window._ref(window._db,`withdrawals/${uid}/${wid}`),{status:'rejected'});
+    showToast('Rejected & refunded $'+(w.amount||0).toFixed(2));
+  }
+  if(document.getElementById('user-modal').classList.contains('show')) openModal(uid);
+}
+
+// ── REWARDS ──
+function saveRewards(){
+  const cfg={
+    adReward:    parseFloat(document.getElementById('c-ad').value)||.30,
+    maxAds:      parseInt(document.getElementById('c-maxads').value)||20,
+    invReward:   parseFloat(document.getElementById('c-inv').value)||.60,
+    minWithdraw: parseFloat(document.getElementById('c-minwd').value)||18,
+    taskReward:  parseFloat(document.getElementById('c-task').value)||.08,
+  };
+  window._update(window._ref(window._db,'cp_config'),cfg);
+  showToast('Config saved to Firebase ✓');
+}
+
+// ── BROADCAST ──
+function copyBc(){
+  const t=document.getElementById('bc-text').value.trim();
+  if(!t){showToast('Write a message first');return;}
+  navigator.clipboard?.writeText(t).then(()=>showToast('Copied ✓'));
+}
+
+// ── NAV ──
+function nav(page){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('on'));
+  document.getElementById('page-'+page).classList.add('on');
+  document.querySelector('.nav-item[onclick="nav(\''+page+'\')"]')?.classList.add('on');
+  if(page==='users') renderUsers();
+  if(page==='withdrawals') renderWithdrawals();
+  if(window.innerWidth<600) document.getElementById('sidebar').classList.remove('open');
+}
+
+function toggleSidebar(){
+  if(window.innerWidth<600) document.getElementById('sidebar').classList.toggle('open');
+}
+
+// ── TOAST ──
+let tT;
+function showToast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.classList.add('show');
+  clearTimeout(tT);tT=setTimeout(()=>el.classList.remove('show'),2500);
+}
+</script>
+</body>
+</html>
