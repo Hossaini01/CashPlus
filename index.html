@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <title>CashPlus – Rewards Center</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<script src='//libtl.com/sdk.js' data-zone='11052002' data-sdk='show_11052002'></script>
+<script src='https://sad.adsgram.ai/js/sad.min.js'></script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getDatabase, ref, get, set, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
@@ -895,6 +895,20 @@ function updateBalance(delta){
 // ═══════════════════════════════════════════════════════
 const AD_PER_VIEW = 0.30;
 const MAX_ADS = 20;
+const ADSGRAM_BLOCK_ID = '35156';
+
+// Initialize Adsgram controller (created once SDK is loaded)
+let AdController = null;
+function initAdsgram(){
+  try {
+    if(window.Adsgram){
+      AdController = window.Adsgram.init({ blockId: ADSGRAM_BLOCK_ID });
+    }
+  } catch(e){ console.error('Adsgram init error:', e); }
+}
+initAdsgram();
+// In case the SDK script loads after this point
+window.addEventListener('load', () => { if(!AdController) initAdsgram(); });
 
 function updateAdUI(){
   document.getElementById('ad-count-display').textContent = adCount+' / '+MAX_ADS;
@@ -920,9 +934,11 @@ function watchAd(){
   amountEl.textContent = '+$0.30';
   loadingText.textContent = 'Loading ad...';
 
-  // Use Monetag rewarded interstitial
-  if(typeof show_11052002 === 'function'){
-    show_11052002().then(() => {
+  // Use Adsgram rewarded interstitial
+  if(!AdController) initAdsgram();
+
+  if(AdController){
+    AdController.show().then(() => {
       // Ad watched successfully — reward user
       spinner.style.display = 'none';
       successIcon.style.display = 'block';
@@ -935,7 +951,7 @@ function watchAd(){
       updateAdUI();
       setTimeout(()=>{ overlay.classList.remove('show'); }, 1800);
     }).catch(() => {
-      // Ad failed or was skipped — no reward
+      // Ad failed, skipped, or not completed — no reward
       overlay.classList.remove('show');
       showToast('Ad was not completed. Please try again.');
     });
