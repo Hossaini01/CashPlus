@@ -218,6 +218,8 @@ tr:hover td{background:rgba(255,255,255,.015)}
           <div class="s-card g"><div class="s-lbl">Balance Owed</div><div class="s-val" id="st-bal">—</div></div>
           <div class="s-card r"><div class="s-lbl">Pending Withdrawals</div><div class="s-val" id="st-pend">—</div></div>
           <div class="s-card gr"><div class="s-lbl">Active Today</div><div class="s-val" id="st-active">—</div></div>
+          <div class="s-card" style="border-color:rgba(139,92,246,.3)"><div class="s-lbl">Total Paid Out</div><div class="s-val" style="color:var(--purple)" id="st-paidout">—</div></div>
+          <div class="s-card" style="border-color:rgba(239,68,68,.3)"><div class="s-lbl">Withdrawal Requests</div><div class="s-val" style="color:var(--red)" id="st-wdreq">—</div></div>
         </div>
         <div class="tbl-card">
           <div class="tbl-hdr"><div class="tbl-title">Recent Users (Live)</div></div>
@@ -287,13 +289,53 @@ tr:hover td{background:rgba(255,255,255,.015)}
       <!-- BROADCAST -->
       <div class="page" id="page-broadcast">
         <div class="pg-title">📢 Broadcast</div>
-        <div class="pg-sub">Copy message and send via your bot</div>
+        <div class="pg-sub">ارسال مستقیم پیام/عکس/ویدیو + دکمه شیشه‌ای به همه کاربران از طریق ربات</div>
+
         <div class="cfg-card">
-          <div class="cfg-title">✉️ Compose</div>
-          <textarea class="bc-ta" id="bc-text" placeholder="Type your message..."></textarea>
+          <div class="cfg-title">🔑 اتصال ربات</div>
+          <div class="f-row">
+            <div class="f-grp" style="grid-column:1/-1">
+              <div class="f-lbl">Bot Token</div>
+              <input type="password" class="f-inp" id="bc-token" placeholder="123456789:AAExxxxxxxxxxxxxxxxxxxxxxxxxxxxx"/>
+            </div>
+          </div>
+          <button class="save-btn" onclick="saveBotToken()">💾 ذخیره توکن در Firebase</button>
+        </div>
+
+        <div class="cfg-card">
+          <div class="cfg-title">✉️ ساخت پیام</div>
+
+          <div class="f-grp" style="margin-bottom:10px">
+            <div class="f-lbl">نوع پیام</div>
+            <select class="f-inp" id="bc-type" onchange="toggleBcMedia()">
+              <option value="text">فقط متن</option>
+              <option value="photo">🖼️ عکس + متن</option>
+              <option value="video">🎬 ویدیو + متن</option>
+            </select>
+          </div>
+
+          <div class="f-grp" id="bc-media-row" style="display:none;margin-bottom:10px">
+            <div class="f-lbl">لینک عکس/ویدیو (URL مستقیم)</div>
+            <input class="f-inp" id="bc-media" placeholder="https://example.com/image.jpg"/>
+          </div>
+
+          <textarea class="bc-ta" id="bc-text" placeholder="متن پیام یا کپشن..."></textarea>
+
+          <div style="font-size:.68rem;color:var(--muted);margin:2px 0 8px;text-transform:uppercase;letter-spacing:.6px">دکمه‌های شیشه‌ای (Inline Buttons)</div>
+          <div id="bc-buttons"></div>
+          <button class="a-btn" onclick="addBcButton()" style="margin-bottom:12px">+ افزودن دکمه</button>
+
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-            <button class="bc-btn" onclick="copyBc()">📋 Copy Message</button>
-            <span style="font-size:.72rem;color:var(--muted)">Recipients: <span id="bc-count" style="color:var(--cyan)">0</span> users</span>
+            <button class="bc-btn" onclick="sendBroadcast()" id="bc-send-btn">🚀 ارسال به همه کاربران</button>
+            <button class="bc-btn" style="background:linear-gradient(135deg,#374151,#1f2937)" onclick="copyBc()">📋 کپی متن</button>
+            <span style="font-size:.72rem;color:var(--muted)">گیرندگان: <span id="bc-count" style="color:var(--cyan)">0</span> کاربر</span>
+          </div>
+
+          <div id="bc-progress" style="display:none;margin-top:14px">
+            <div style="height:6px;background:var(--surface);border-radius:4px;overflow:hidden">
+              <div id="bc-bar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--purple),var(--cyan));transition:width .2s"></div>
+            </div>
+            <div style="font-size:.7rem;color:var(--muted);margin-top:6px;font-family:'JetBrains Mono',monospace" id="bc-status">در حال ارسال...</div>
           </div>
         </div>
       </div>
@@ -374,6 +416,7 @@ function startFirebaseListeners(){
   wdListener = window._onValue(window._ref(db,'withdrawals'), snap => {
     allWd = snap.exists() ? snap.val() : {};
     renderWdBadge();
+    renderDashboard();
     if(document.getElementById('page-withdrawals').classList.contains('on')) renderWithdrawals();
   });
 
@@ -386,6 +429,7 @@ function startFirebaseListeners(){
       if(c.invReward)   document.getElementById('c-inv').value=c.invReward;
       if(c.minWithdraw) document.getElementById('c-minwd').value=c.minWithdraw;
       if(c.taskReward)  document.getElementById('c-task').value=c.taskReward;
+      if(c.botToken)    document.getElementById('bc-token').value=c.botToken;
     }
   });
 }
@@ -411,16 +455,22 @@ function renderDashboard(){
     if(lastReset === today && (d.adsToday||d.ads_today||0)>0) activeToday++;
   });
 
-  // Pending withdrawals
-  let pending=0;
+  // Pending withdrawals + paid out + total requests
+  let pending=0, paidOut=0, totalRequests=0;
   Object.values(allWd).forEach(userWds=>{
-    Object.values(userWds||{}).forEach(w=>{ if(w.status==='processing'||w.status==='pending') pending++; });
+    Object.values(userWds||{}).forEach(w=>{
+      totalRequests++;
+      if(w.status==='processing'||w.status==='pending') pending++;
+      if(w.status==='paid') paidOut += (w.amount||0);
+    });
   });
 
   document.getElementById('st-users').textContent  = users.length;
   document.getElementById('st-bal').textContent    = '$'+totalBal.toFixed(2);
   document.getElementById('st-pend').textContent   = pending;
   document.getElementById('st-active').textContent = activeToday;
+  document.getElementById('st-paidout').textContent = '$'+paidOut.toFixed(2);
+  document.getElementById('st-wdreq').textContent   = totalRequests;
 
   const tbody = document.getElementById('dash-tbody');
   tbody.innerHTML='';
@@ -594,10 +644,117 @@ function saveRewards(){
 }
 
 // ── BROADCAST ──
+let bcButtons = []; // {text,url}
+
+function toggleBcMedia(){
+  const t = document.getElementById('bc-type').value;
+  document.getElementById('bc-media-row').style.display = (t==='photo'||t==='video') ? '' : 'none';
+}
+
+function addBcButton(){
+  if(bcButtons.length>=5){ showToast('حداکثر ۵ دکمه مجاز است'); return; }
+  bcButtons.push({text:'',url:''});
+  renderBcButtons();
+}
+function removeBcButton(i){ bcButtons.splice(i,1); renderBcButtons(); }
+function updateBcButton(i,field,val){ bcButtons[i][field]=val; }
+
+function renderBcButtons(){
+  const c = document.getElementById('bc-buttons');
+  c.innerHTML = bcButtons.map((b,i)=>`
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <input class="f-inp" placeholder="متن دکمه" value="${b.text}" oninput="updateBcButton(${i},'text',this.value)" style="flex:1"/>
+      <input class="f-inp" placeholder="لینک URL" value="${b.url}" oninput="updateBcButton(${i},'url',this.value)" style="flex:1.4"/>
+      <button class="a-btn no" onclick="removeBcButton(${i})">✕</button>
+    </div>`).join('');
+}
+
+function saveBotToken(){
+  const tok = document.getElementById('bc-token').value.trim();
+  if(!tok){ showToast('توکن را وارد کنید'); return; }
+  window._update(window._ref(window._db,'cp_config'),{botToken:tok});
+  showToast('توکن ذخیره شد ✓');
+}
+
 function copyBc(){
   const t=document.getElementById('bc-text').value.trim();
   if(!t){showToast('Write a message first');return;}
   navigator.clipboard?.writeText(t).then(()=>showToast('Copied ✓'));
+}
+
+async function sendBroadcast(){
+  let token = document.getElementById('bc-token').value.trim();
+  if(!token){
+    try{
+      const snap = await window._get(window._ref(window._db,'cp_config/botToken'));
+      if(snap.exists()) token = snap.val();
+    }catch(e){}
+  }
+  if(!token){ showToast('ابتدا Bot Token را وارد و ذخیره کنید'); return; }
+
+  const type  = document.getElementById('bc-type').value;
+  const text  = document.getElementById('bc-text').value.trim();
+  const media = document.getElementById('bc-media').value.trim();
+
+  if(type==='text' && !text){ showToast('متن پیام را بنویسید'); return; }
+  if((type==='photo'||type==='video') && !media){ showToast('لینک عکس/ویدیو را وارد کنید'); return; }
+
+  const validButtons = bcButtons.filter(b=>b.text.trim() && b.url.trim());
+  let reply_markup = null;
+  if(validButtons.length){
+    reply_markup = { inline_keyboard: validButtons.map(b=>[{text:b.text.trim(), url:b.url.trim()}]) };
+  }
+
+  const chatIds = Object.keys(allUsers);
+  if(!chatIds.length){ showToast('کاربری برای ارسال وجود ندارد'); return; }
+  if(!confirm(`پیام برای ${chatIds.length} کاربر ارسال شود؟`)) return;
+
+  const btn = document.getElementById('bc-send-btn');
+  btn.disabled = true;
+  const prog   = document.getElementById('bc-progress');
+  const bar    = document.getElementById('bc-bar');
+  const status = document.getElementById('bc-status');
+  prog.style.display = 'block';
+
+  let sent=0, failed=0;
+  const apiBase = `https://api.telegram.org/bot${token}`;
+
+  for(let i=0;i<chatIds.length;i++){
+    const chatId = chatIds[i];
+    let url, payload;
+    if(type==='photo'){
+      url = apiBase+'/sendPhoto';
+      payload = {chat_id:chatId, photo:media};
+      if(text) payload.caption = text;
+    } else if(type==='video'){
+      url = apiBase+'/sendVideo';
+      payload = {chat_id:chatId, video:media};
+      if(text) payload.caption = text;
+    } else {
+      url = apiBase+'/sendMessage';
+      payload = {chat_id:chatId, text:text};
+    }
+    if(reply_markup) payload.reply_markup = reply_markup;
+
+    try{
+      const res  = await fetch(url,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if(data.ok) sent++; else failed++;
+    }catch(e){ failed++; }
+
+    const pct = Math.round(((i+1)/chatIds.length)*100);
+    bar.style.width = pct+'%';
+    status.textContent = `ارسال شده: ${sent} · ناموفق: ${failed} · ${i+1}/${chatIds.length}`;
+
+    await new Promise(r=>setTimeout(r,40)); // ~25 پیام در ثانیه، مطابق محدودیت تلگرام
+  }
+
+  btn.disabled = false;
+  showToast(`اتمام ارسال ✓ موفق: ${sent} — ناموفق: ${failed}`);
 }
 
 // ── NAV ──
