@@ -888,6 +888,24 @@ function updateBalance(delta){
   balance = Math.max(0, balance + delta);
   save('balance', balance);
   document.getElementById('user-balance').textContent = '$'+balance.toFixed(2);
+  syncBalanceToFirebase();
+}
+
+// ── Sync current balance to Firebase (cp_users/{uid}) so Admin panel sees live data ──
+let _balanceSyncTimer = null;
+function syncBalanceToFirebase(){
+  if(!userId) return;
+  clearTimeout(_balanceSyncTimer);
+  _balanceSyncTimer = setTimeout(async ()=>{
+    if(!window._cpFirebaseReady || !window._cpDb) return;
+    try{
+      await window._cpUpd(window._cpRef(window._cpDb,'cp_users/'+userId), {
+        balance: +balance.toFixed(2),
+        inviteCount: inviteCount,
+        inviteEarned: +inviteEarned.toFixed(2)
+      });
+    }catch(e){ console.error('balance sync error:', e); }
+  }, 400);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1092,6 +1110,28 @@ function updateWithdrawHint(){
   if(amtHint) amtHint.textContent = t('avail')+'$'+balance.toFixed(2)+' · '+t('min_withdraw');
 }
 
+// ── Push a withdrawal request to Firebase so the Admin panel can see/approve/reject it ──
+async function pushWithdrawToFirebase(entry, method){
+  if(!userId) return;
+  const doPush = async () => {
+    if(!window._cpDb) return;
+    try{
+      await window._cpSet(window._cpRef(window._cpDb, 'withdrawals/'+userId+'/'+entry.id), {
+        amount: entry.amount,
+        method: method,
+        address: entry.address,
+        timestamp: entry.id,
+        status: 'processing'
+      });
+    }catch(e){ console.error('withdraw sync error:', e); }
+  };
+  if(window._cpFirebaseReady){
+    await doPush();
+  } else {
+    document.addEventListener('cpFirebaseReady', doPush, { once:true });
+  }
+}
+
 function submitWithdraw(){
   const amt = parseFloat(document.getElementById('withdraw-amount').value);
   const addr = document.getElementById('withdraw-address').value.trim();
@@ -1113,6 +1153,9 @@ function submitWithdraw(){
   };
   withdrawHistory.unshift(entry);
   save('withdraw_history', withdrawHistory);
+
+  // ── Send the request to Firebase so it shows up in the Admin panel ──
+  pushWithdrawToFirebase(entry, METHOD_LABELS[selectedMethod]);
 
   // Show processing card
   const card = document.getElementById('processing-card');
@@ -1137,6 +1180,51 @@ function submitWithdraw(){
   showToast(t('req_submitted'));
 }
 
+// ── Poll Firebase for status changes on this user's withdrawals (approved/rejected in Admin) ──
+async function syncWithdrawStatusesFromFirebase(){
+  if(!window._cpFirebaseReady || !window._cpDb || !userId) return;
+  try{
+    const snap = await window._cpGet(window._cpRef(window._cpDb,'withdrawals/'+userId));
+    if(!snap.exists()) return;
+    const remote = snap.val();
+    let changed = false;
+    let refundTotal = 0;
+
+    withdrawHistory.forEach(h=>{
+      const r = remote[h.id];
+      if(r && r.status && r.status !== h.status){
+        // If admin rejected it and balance was refunded on the admin side,
+        // reflect that refund locally too (admin refund logic adds amount back to cp_users balance,
+        // which syncInviteFromFirebase-style balance pull below will pick up).
+        h.status = r.status;
+        changed = true;
+      }
+    });
+
+    if(changed){
+      save('withdraw_history', withdrawHistory);
+      renderHistory();
+    }
+  }catch(e){ console.error('withdraw status sync error:', e); }
+}
+
+// ── Also pull the authoritative balance from Firebase (covers admin edits & rejections/refunds) ──
+async function pullBalanceFromFirebase(){
+  if(!window._cpFirebaseReady || !window._cpDb || !userId) return;
+  try{
+    const snap = await window._cpGet(window._cpRef(window._cpDb,'cp_users/'+userId));
+    if(snap.exists()){
+      const d = snap.val();
+      if(typeof d.balance === 'number' && d.balance !== balance){
+        balance = d.balance;
+        save('balance', balance);
+        document.getElementById('user-balance').textContent = '$'+balance.toFixed(2);
+        updateWithdrawHint();
+      }
+    }
+  }catch(e){ console.error('balance pull error:', e); }
+}
+
 function renderHistory(){
   const list = document.getElementById('history-list');
   if(!withdrawHistory.length){
@@ -1144,8 +1232,8 @@ function renderHistory(){
     return;
   }
   list.innerHTML = withdrawHistory.map(h=>{
-    const statusClass = h.status==='paid'?'paid':h.status==='processing'?'processing':'pending';
-    const statusLabel = h.status==='paid'?'Paid':h.status==='processing'?'Processing':'Pending';
+    const statusClass = h.status==='paid'?'paid':h.status==='processing'?'processing':(h.status==='rejected'?'pending':'pending');
+    const statusLabel = h.status==='paid'?'Paid':h.status==='processing'?'Processing':(h.status==='rejected'?'Rejected':'Pending');
     const shortAddr = h.address.length>20 ? h.address.slice(0,10)+'...'+h.address.slice(-8) : h.address;
     return `
       <div class="history-item">
@@ -1172,7 +1260,12 @@ function switchTab(name){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('screen-'+name).classList.add('active');
   document.getElementById('tab-'+name).classList.add('active');
-  if(name==='withdraw'){ updateWithdrawHint(); renderHistory(); }
+  if(name==='withdraw'){
+    updateWithdrawHint();
+    renderHistory();
+    pullBalanceFromFirebase();
+    syncWithdrawStatusesFromFirebase();
+  }
 }
 
 // ── SVG stroke fix for active tabs ──
@@ -1289,11 +1382,11 @@ async function syncInviteFromFirebase(){
       renderInvite();
       renderUserCard();
     } else {
-      // First time — only save invite fields, balance managed locally
+      // First time — save invite fields AND current local balance so Admin sees this user immediately
       await window._cpSet(window._cpRef(window._cpDb, 'cp_users/' + userId), {
-        inviteCount: 0,
-        inviteEarned: 0,
-        balance: 0
+        inviteCount: inviteCount,
+        inviteEarned: +inviteEarned.toFixed(2),
+        balance: +balance.toFixed(2)
       });
     }
   } catch(e){ console.error('syncInvite error:', e); }
