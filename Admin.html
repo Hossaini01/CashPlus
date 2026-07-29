@@ -251,9 +251,15 @@ tr:hover td{background:rgba(255,255,255,.015)}
         <div class="pg-title">💸 Withdrawals</div>
         <div class="pg-sub">Live withdrawal requests from Firebase</div>
         <div class="tbl-card">
-          <div class="tbl-hdr"><div class="tbl-title">All Requests</div></div>
+          <div class="tbl-hdr">
+            <div class="tbl-title">All Requests</div>
+            <div style="display:flex;gap:6px">
+              <button class="a-btn ok" onclick="bulkApproveWd()">✓ تایید همه انتخاب‌شده</button>
+              <button class="a-btn no" onclick="bulkRejectWd()">✗ رد همه انتخاب‌شده</button>
+            </div>
+          </div>
           <div class="tbl-wrap">
-            <table><thead><tr><th>User ID</th><th>Amount</th><th>Method</th><th>Address</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
+            <table><thead><tr><th><input type="checkbox" id="wd-select-all" onchange="toggleSelectAllWd(this)"/></th><th>User ID</th><th>Amount</th><th>Method</th><th>Address</th><th>Date</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody id="wd-tbody"></tbody></table>
           </div>
         </div>
@@ -586,21 +592,25 @@ function renderWithdrawals(){
 
   rows.forEach(({uid,wid,w})=>{
     const st = w.status||'pending';
+    const isActionable = (st==='processing'||st==='pending');
     const tr=document.createElement('tr');
     tr.innerHTML=`
+      <td>${isActionable?`<input type="checkbox" class="wd-check" data-uid="${uid}" data-wid="${wid}"/>`:''}</td>
       <td class="mono" style="color:var(--cyan)">${uid}</td>
       <td class="mono" style="color:var(--gold)">$${(w.amount||0).toFixed(2)}</td>
       <td>${w.method||'USDT'}</td>
       <td class="mono" style="font-size:.68rem;max-width:100px;overflow:hidden;text-overflow:ellipsis">${(w.address||'').slice(0,16)}...</td>
       <td style="color:var(--muted);font-size:.7rem">${new Date(w.timestamp||Date.now()).toLocaleDateString()}</td>
       <td><span class="badge ${st}">${st}</span></td>
-      <td>${(st==='processing'||st==='pending')?`
+      <td>${isActionable?`
         <button class="a-btn ok" onclick="approveWd('${uid}','${wid}')">✓</button>
         <button class="a-btn no" onclick="rejectWd('${uid}','${wid}')">✗</button>
       `:'-'}</td>`;
     tbody.appendChild(tr);
   });
-  if(!rows.length) tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:20px">No withdrawals yet</td></tr>';
+  if(!rows.length) tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:20px">No withdrawals yet</td></tr>';
+  const selAll = document.getElementById('wd-select-all');
+  if(selAll) selAll.checked = false;
 }
 
 function renderWdBadge(){
@@ -609,6 +619,41 @@ function renderWdBadge(){
   const el=document.getElementById('nb-wd');
   el.textContent=p;
   el.style.display=p>0?'':'none';
+}
+
+function toggleSelectAllWd(cb){
+  document.querySelectorAll('.wd-check').forEach(c=>c.checked = cb.checked);
+}
+
+function getSelectedWd(){
+  return Array.from(document.querySelectorAll('.wd-check:checked')).map(c=>({uid:c.dataset.uid, wid:c.dataset.wid}));
+}
+
+async function bulkApproveWd(){
+  const sel = getSelectedWd();
+  if(!sel.length){ showToast('چیزی انتخاب نشده'); return; }
+  if(!confirm(`${sel.length} برداشت تایید شود؟`)) return;
+  for(const {uid,wid} of sel){
+    await window._update(window._ref(window._db,`withdrawals/${uid}/${wid}`),{status:'paid'});
+  }
+  showToast(`${sel.length} برداشت تایید شد ✓`);
+}
+
+async function bulkRejectWd(){
+  const sel = getSelectedWd();
+  if(!sel.length){ showToast('چیزی انتخاب نشده'); return; }
+  if(!confirm(`${sel.length} برداشت رد و مبلغ بازگردانده شود؟`)) return;
+  for(const {uid,wid} of sel){
+    const snap = await window._get(window._ref(window._db,`withdrawals/${uid}/${wid}`));
+    if(snap.exists()){
+      const w=snap.val();
+      const d=allUsers[uid]||{};
+      const newBal = +((d.balance||0)+(w.amount||0)).toFixed(2);
+      await window._update(window._ref(window._db,`cp_users/${uid}`),{balance:newBal});
+      await window._update(window._ref(window._db,`withdrawals/${uid}/${wid}`),{status:'rejected'});
+    }
+  }
+  showToast(`${sel.length} برداشت رد شد ✓`);
 }
 
 async function approveWd(uid,wid){
