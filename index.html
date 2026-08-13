@@ -6,6 +6,9 @@
 <title>CashPlus – Rewards Center</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src='https://sad.adsgram.ai/js/sad.min.js'></script>
+
+<!-- AdsGalaxy SDK -->
+<script src="https://app.adsgalaxy.online/sdk.js?id=34"></script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getDatabase, ref, get, set, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
@@ -957,17 +960,9 @@ function watchAd(){
 
   if(AdController){
     AdController.show().then(() => {
-      // Ad watched successfully — reward user
-      spinner.style.display = 'none';
-      successIcon.style.display = 'block';
-      loadingText.textContent = t('ad_done');
-      adCount++;
-      adsTotalEarned += AD_PER_VIEW;
-      save('ads_today', adCount);
-      save('ads_earned', adsTotalEarned);
-      updateBalance(AD_PER_VIEW);
-      updateAdUI();
-      setTimeout(()=>{ overlay.classList.remove('show'); }, 1800);
+      // Adsgram watched successfully -> now play AdsGalaxy automatically, then reward
+      loadingText.textContent = 'Loading bonus ad...';
+      playAdsGalaxyThenReward();
     }).catch(() => {
       // Ad failed, skipped, or not completed — no reward
       overlay.classList.remove('show');
@@ -982,19 +977,51 @@ function watchAd(){
       loadingText.textContent = msgs[Math.min(sec-1, msgs.length-1)];
       if(sec>=10){
         clearInterval(interval);
-        spinner.style.display = 'none';
-        successIcon.style.display = 'block';
-        loadingText.textContent = t('ad_done');
-        adCount++;
-        adsTotalEarned += AD_PER_VIEW;
-        save('ads_today', adCount);
-        save('ads_earned', adsTotalEarned);
-        updateBalance(AD_PER_VIEW);
-        updateAdUI();
-        setTimeout(()=>{ overlay.classList.remove('show'); }, 1800);
+        // Simulated Adsgram fallback finished -> now play AdsGalaxy automatically, then reward
+        loadingText.textContent = 'Loading bonus ad...';
+        playAdsGalaxyThenReward();
       }
     }, 1000);
   }
+}
+
+// ── پس از تکمیل Adsgram: پخش خودکار AdsGalaxy، سپس ثبت پاداش ──────
+// دیدن AdsGalaxy اجباری نیست: چه کاربر تا آخر ببیند (then) چه ببندد/خطا
+// بخورد (catch)، در هر دو حالت پاداش داده می‌شود چون Adsgram کامل دیده شده.
+function playAdsGalaxyThenReward(){
+  if(typeof window.showAdsGalaxy !== 'function'){
+    console.warn('AdsGalaxy SDK not loaded, granting reward directly');
+    grantAdReward();
+    return;
+  }
+  window.showAdsGalaxy()
+    .then((result) => {
+      console.log('AdsGalaxy result:', result);
+      grantAdReward();
+    })
+    .catch((error) => {
+      console.log('AdsGalaxy closed/error (reward still granted):', error?.code, error?.message);
+      grantAdReward();
+    });
+}
+
+// ── ثبت پاداش نهایی (بعد از Adsgram + AdsGalaxy) ──────────────────
+function grantAdReward(){
+  const overlay = document.getElementById('ad-loading');
+  const spinner = document.getElementById('ad-spinner');
+  const successIcon = document.getElementById('ad-success-icon');
+  const loadingText = document.getElementById('ad-loading-text');
+
+  spinner.style.display = 'none';
+  successIcon.style.display = 'block';
+  loadingText.textContent = t('ad_done');
+  adCount++;
+  adsTotalEarned += AD_PER_VIEW;
+  save('ads_today', adCount);
+  save('ads_earned', adsTotalEarned);
+  updateBalance(AD_PER_VIEW);
+  updateAdUI();
+  setTimeout(()=>{ overlay.classList.remove('show'); }, 1800);
 }
 
 document.getElementById('ad-loading').addEventListener('click', ()=>{});
