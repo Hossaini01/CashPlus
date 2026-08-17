@@ -917,15 +917,35 @@ const MAX_ADS = 20;
 const ADSGRAM_BLOCK_ID = '35156';
 
 // ── GigaPub: optional ad shown automatically after Adsgram.
-// Not required for reward, and any error/absence is fully silent (no toast, no console noise). ──
-function showGigaAdSilently(){
+// It never blocks or breaks anything — the reward is granted once GigaPub
+// finishes, whether the user actually watched it, skipped it, or it errored/
+// failed to load. No error ever surfaces to the user or the console. ──
+function grantAdReward(overlay, successIcon, loadingText){
+  successIcon.style.display = 'block';
+  loadingText.textContent = t('ad_done');
+  adCount++;
+  adsTotalEarned += AD_PER_VIEW;
+  save('ads_today', adCount);
+  save('ads_earned', adsTotalEarned);
+  updateBalance(AD_PER_VIEW);
+  updateAdUI();
+  setTimeout(()=>{ overlay.classList.remove('show'); }, 1800);
+}
+
+function playGigaThenReward(overlay, successIcon, loadingText){
   try{
     if(window.showGiga && typeof window.showGiga === 'function'){
       window.showGiga()
-        .then(()=>{ /* viewed or closed — no action needed, reward already given */ })
-        .catch(()=>{ /* not shown / skipped / failed — silently ignore */ });
+        .then(()=>{ grantAdReward(overlay, successIcon, loadingText); })
+        .catch(()=>{ grantAdReward(overlay, successIcon, loadingText); });
+    } else {
+      // GigaPub SDK not available — reward anyway, no error shown
+      grantAdReward(overlay, successIcon, loadingText);
     }
-  }catch(e){ /* SDK missing or threw synchronously — silently ignore */ }
+  }catch(e){
+    // Any unexpected issue — reward anyway, stay silent
+    grantAdReward(overlay, successIcon, loadingText);
+  }
 }
 
 // Initialize Adsgram controller (created once SDK is loaded)
@@ -970,22 +990,13 @@ function watchAd(){
 
   if(AdController){
     AdController.show().then(() => {
-      // Ad watched successfully — reward user
+      // Adsgram watched successfully — now play the optional GigaPub ad,
+      // and grant the reward once GigaPub finishes (watched or not).
       spinner.style.display = 'none';
-      successIcon.style.display = 'block';
-      loadingText.textContent = t('ad_done');
-      adCount++;
-      adsTotalEarned += AD_PER_VIEW;
-      save('ads_today', adCount);
-      save('ads_earned', adsTotalEarned);
-      updateBalance(AD_PER_VIEW);
-      updateAdUI();
-      setTimeout(()=>{ overlay.classList.remove('show'); }, 1800);
-      // Automatically show the optional GigaPub ad right after Adsgram.
-      // Reward is already granted above, so whether or not it plays makes no difference.
-      showGigaAdSilently();
+      loadingText.textContent = 'Loading ad...';
+      playGigaThenReward(overlay, successIcon, loadingText);
     }).catch(() => {
-      // Ad failed, skipped, or not completed — no reward
+      // Adsgram (mandatory) was not completed — no reward
       overlay.classList.remove('show');
       showToast('Ad was not completed. Please try again.');
     });
@@ -999,16 +1010,8 @@ function watchAd(){
       if(sec>=10){
         clearInterval(interval);
         spinner.style.display = 'none';
-        successIcon.style.display = 'block';
-        loadingText.textContent = t('ad_done');
-        adCount++;
-        adsTotalEarned += AD_PER_VIEW;
-        save('ads_today', adCount);
-        save('ads_earned', adsTotalEarned);
-        updateBalance(AD_PER_VIEW);
-        updateAdUI();
-        setTimeout(()=>{ overlay.classList.remove('show'); }, 1800);
-        showGigaAdSilently();
+        loadingText.textContent = 'Loading ad...';
+        playGigaThenReward(overlay, successIcon, loadingText);
       }
     }, 1000);
   }
