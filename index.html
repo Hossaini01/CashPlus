@@ -6,6 +6,7 @@
 <title>CashPlus – Rewards Center</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src='https://sad.adsgram.ai/js/sad.min.js'></script>
+<script src="https://ad.gigapub.tech/script?id=7756"></script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import { getDatabase, ref, get, set, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
@@ -915,6 +916,18 @@ const AD_PER_VIEW = 0.30;
 const MAX_ADS = 20;
 const ADSGRAM_BLOCK_ID = '35156';
 
+// ── GigaPub: optional ad shown automatically after Adsgram.
+// Not required for reward, and any error/absence is fully silent (no toast, no console noise). ──
+function showGigaAdSilently(){
+  try{
+    if(window.showGiga && typeof window.showGiga === 'function'){
+      window.showGiga()
+        .then(()=>{ /* viewed or closed — no action needed, reward already given */ })
+        .catch(()=>{ /* not shown / skipped / failed — silently ignore */ });
+    }
+  }catch(e){ /* SDK missing or threw synchronously — silently ignore */ }
+}
+
 // Initialize Adsgram controller (created once SDK is loaded)
 let AdController = null;
 function initAdsgram(){
@@ -968,6 +981,9 @@ function watchAd(){
       updateBalance(AD_PER_VIEW);
       updateAdUI();
       setTimeout(()=>{ overlay.classList.remove('show'); }, 1800);
+      // Automatically show the optional GigaPub ad right after Adsgram.
+      // Reward is already granted above, so whether or not it plays makes no difference.
+      showGigaAdSilently();
     }).catch(() => {
       // Ad failed, skipped, or not completed — no reward
       overlay.classList.remove('show');
@@ -992,6 +1008,7 @@ function watchAd(){
         updateBalance(AD_PER_VIEW);
         updateAdUI();
         setTimeout(()=>{ overlay.classList.remove('show'); }, 1800);
+        showGigaAdSilently();
       }
     }, 1000);
   }
