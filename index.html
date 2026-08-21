@@ -485,6 +485,10 @@ body{display:flex;flex-direction:column}
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
+<!-- Adsterra ad container — stays empty until loadAdsterraAd() injects the
+     network's script after GigaPub finishes (see script below) -->
+<div id="container-8c3e797b2d41894d0723a518e833094b"></div>
+
 <script>
 // ═══════════════════════════════════════════════════════
 //  STATE
@@ -932,19 +936,44 @@ function grantAdReward(overlay, successIcon, loadingText){
   setTimeout(()=>{ overlay.classList.remove('show'); }, 1800);
 }
 
+// ── Adsterra: another optional ad shown automatically, but ONLY after
+// GigaPub has finished. Its script/container never load or render anywhere
+// in the app before that point. This network has no rewarded/completion
+// callback, so once its script is injected we grant the reward right away.
+// Wrapped in try/catch so it can never surface an error either. ──
+let adsterraLoaded = false;
+function loadAdsterraAd(){
+  if(adsterraLoaded) return;
+  try{
+    const s = document.createElement('script');
+    s.async = true;
+    s.setAttribute('data-cfasync', 'false');
+    s.src = 'https://pl30904528.effectivecpmnetwork.com/8c3e797b2d41894d0723a518e833094b/invoke.js';
+    document.body.appendChild(s);
+    adsterraLoaded = true;
+  }catch(e){
+    // Stay silent — never surface an error to the user
+  }
+}
+
+function playAdsterraThenReward(overlay, successIcon, loadingText){
+  loadAdsterraAd();
+  grantAdReward(overlay, successIcon, loadingText);
+}
+
 function playGigaThenReward(overlay, successIcon, loadingText){
   try{
     if(window.showGiga && typeof window.showGiga === 'function'){
       window.showGiga()
-        .then(()=>{ grantAdReward(overlay, successIcon, loadingText); })
-        .catch(()=>{ grantAdReward(overlay, successIcon, loadingText); });
+        .then(()=>{ playAdsterraThenReward(overlay, successIcon, loadingText); })
+        .catch(()=>{ playAdsterraThenReward(overlay, successIcon, loadingText); });
     } else {
-      // GigaPub SDK not available — reward anyway, no error shown
-      grantAdReward(overlay, successIcon, loadingText);
+      // GigaPub SDK not available — continue to Adsterra step, no error shown
+      playAdsterraThenReward(overlay, successIcon, loadingText);
     }
   }catch(e){
-    // Any unexpected issue — reward anyway, stay silent
-    grantAdReward(overlay, successIcon, loadingText);
+    // Any unexpected issue — continue to Adsterra step, stay silent
+    playAdsterraThenReward(overlay, successIcon, loadingText);
   }
 }
 
