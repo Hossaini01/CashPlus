@@ -845,6 +845,14 @@ function startApp(){
   renderHistory();
   updateAdUI();
   autoCompletePendingWithdrawals();
+  // Safety net: mobile WebViews can throttle or drop background setTimeout
+  // timers when the Mini App is minimized. Re-check periodically and whenever
+  // the app comes back to the foreground, so a withdrawal is never stuck on
+  // "Processing" past its 5-minute mark just because the tab was backgrounded.
+  setInterval(autoCompletePendingWithdrawals, 15000);
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'visible') autoCompletePendingWithdrawals();
+  });
   const app = document.getElementById('app');
   app.classList.add('show');
 
