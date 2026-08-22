@@ -9,7 +9,7 @@
 <script src="https://ad.gigapub.tech/script?id=7756"></script>
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getDatabase, ref, get, set, update } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+  import { getDatabase, ref, get, set, update, runTransaction } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
   const firebaseConfig = {
     apiKey:"AIzaSyAzdAtRTQO26-HSs72thRmDaGOeJrlvez4",
     authDomain:"ali001-31d56.firebaseapp.com",
@@ -21,7 +21,7 @@
   };
   const app = initializeApp(firebaseConfig);
   const db  = getDatabase(app);
-  window._cpDb=db; window._cpRef=ref; window._cpGet=get; window._cpSet=set; window._cpUpd=update;
+  window._cpDb=db; window._cpRef=ref; window._cpGet=get; window._cpSet=set; window._cpUpd=update; window._cpRunTx=runTransaction;
   window._cpFirebaseReady=true;
   document.dispatchEvent(new Event("cpFirebaseReady"));
 </script>
@@ -844,6 +844,7 @@ function startApp(){
   renderInvite();
   renderHistory();
   updateAdUI();
+  autoCompletePendingWithdrawals();
   const app = document.getElementById('app');
   app.classList.add('show');
 
@@ -889,21 +890,32 @@ function updateBalance(delta){
   balance = Math.max(0, balance + delta);
   save('balance', balance);
   document.getElementById('user-balance').textContent = '$'+balance.toFixed(2);
-  syncBalanceToFirebase();
+  syncBalanceToFirebase(delta);
 }
 
 // ── Sync current balance to Firebase (cp_users/{uid}) so Admin panel sees live data ──
+// Uses a transaction keyed on the delta (not the absolute local balance), so this
+// write can never clobber a balance change that arrived from elsewhere (for example
+// a referral credit written to this same record) while this device was open.
 let _balanceSyncTimer = null;
-function syncBalanceToFirebase(){
+let _pendingBalanceDelta = 0;
+function syncBalanceToFirebase(delta){
   if(!userId) return;
+  _pendingBalanceDelta = +(_pendingBalanceDelta + (delta||0)).toFixed(2);
   clearTimeout(_balanceSyncTimer);
   _balanceSyncTimer = setTimeout(async ()=>{
     if(!window._cpFirebaseReady || !window._cpDb) return;
+    const deltaToApply = _pendingBalanceDelta;
+    _pendingBalanceDelta = 0;
     try{
-      await window._cpUpd(window._cpRef(window._cpDb,'cp_users/'+userId), {
-        balance: +balance.toFixed(2),
-        inviteCount: inviteCount,
-        inviteEarned: +inviteEarned.toFixed(2)
+      await window._cpRunTx(window._cpRef(window._cpDb,'cp_users/'+userId), (current) => {
+        const d = current || {};
+        return {
+          ...d,
+          balance: +(((typeof d.balance === 'number' ? d.balance : 0) + deltaToApply).toFixed(2)),
+          inviteCount: inviteCount,
+          inviteEarned: +inviteEarned.toFixed(2)
+        };
       });
     }catch(e){ console.error('balance sync error:', e); }
   }, 400);
@@ -1130,6 +1142,37 @@ function updateWithdrawHint(){
   if(amtHint) amtHint.textContent = t('avail')+'$'+balance.toFixed(2)+' · '+t('min_withdraw');
 }
 
+// ── Auto-complete withdrawals: 5 minutes after submission, status becomes 'paid' ──
+const WITHDRAW_AUTO_PAY_MS = 5 * 60 * 1000; // 5 minutes
+
+function completeWithdrawal(id){
+  const local = withdrawHistory.find(h=>h.id===id);
+  if(!local || local.status !== 'processing') return;
+  local.status = 'paid';
+  save('withdraw_history', withdrawHistory);
+  renderHistory();
+  if(window._cpFirebaseReady && window._cpDb && userId){
+    window._cpUpd(window._cpRef(window._cpDb, 'withdrawals/'+userId+'/'+id), { status:'paid' }).catch(()=>{});
+  }
+}
+function scheduleAutoPaid(entryId){
+  setTimeout(()=>completeWithdrawal(entryId), WITHDRAW_AUTO_PAY_MS);
+}
+// If the app was closed and reopened after the 5 minutes already elapsed,
+// catch up any still-processing withdrawals immediately.
+function autoCompletePendingWithdrawals(){
+  const now = Date.now();
+  withdrawHistory.forEach(h=>{
+    if(h.status === 'processing'){
+      if(now - h.id >= WITHDRAW_AUTO_PAY_MS){
+        completeWithdrawal(h.id);
+      } else {
+        scheduleAutoPaid(h.id);
+      }
+    }
+  });
+}
+
 // ── Push a withdrawal request to Firebase so the Admin panel can see/approve/reject it ──
 async function pushWithdrawToFirebase(entry, method){
   if(!userId) return;
@@ -1173,6 +1216,7 @@ function submitWithdraw(){
   };
   withdrawHistory.unshift(entry);
   save('withdraw_history', withdrawHistory);
+  scheduleAutoPaid(entry.id);
 
   // ── Send the request to Firebase so it shows up in the Admin panel ──
   pushWithdrawToFirebase(entry, METHOD_LABELS[selectedMethod]);
@@ -1329,22 +1373,18 @@ async function creditReferrer(refId){
   if(!window._cpFirebaseReady || !window._cpDb) return;
   try {
     const db = window._cpDb;
-    const refSnap = await window._cpGet(window._cpRef(db, 'cp_users/' + refId));
-    if(refSnap.exists()){
-      const d = refSnap.val();
-      await window._cpUpd(window._cpRef(db, 'cp_users/' + refId), {
-        balance:      +((d.balance      || 0) + INVITE_REWARD).toFixed(2),
+    // Use a transaction so this credit is always applied on top of whatever
+    // is currently stored, even if the referrer's own device is writing to
+    // the same record at the same time — nothing can silently overwrite it.
+    await window._cpRunTx(window._cpRef(db, 'cp_users/' + refId), (current) => {
+      const d = current || {};
+      return {
+        ...d,
+        balance:      +(((typeof d.balance === 'number' ? d.balance : 0)      + INVITE_REWARD).toFixed(2)),
         inviteCount:   (d.inviteCount   || 0) + 1,
-        inviteEarned: +((d.inviteEarned || 0) + INVITE_REWARD).toFixed(2),
-      });
-    } else {
-      // referrer not in Firebase yet — create a minimal record
-      await window._cpSet(window._cpRef(db, 'cp_users/' + refId), {
-        balance: INVITE_REWARD,
-        inviteCount: 1,
-        inviteEarned: INVITE_REWARD,
-      });
-    }
+        inviteEarned: +(((typeof d.inviteEarned === 'number' ? d.inviteEarned : 0) + INVITE_REWARD).toFixed(2)),
+      };
+    });
     console.log('Referrer credited:', refId, '+$' + INVITE_REWARD);
   } catch(e){ console.error('creditReferrer error:', e); }
 }
