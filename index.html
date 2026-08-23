@@ -1465,39 +1465,24 @@ async function syncInviteFromFirebase(){
 // ═══════════════════════════════════════════════════════
 
 // Run referral + sync after Firebase is ready
-async function runFirebaseInit(){
+function runFirebaseInit(){
   handleReferral();
-  await syncInviteFromFirebase();
+  syncInviteFromFirebase();
 }
 
-async function boot(){
-  // Wait for the initial Firebase balance/invite sync (with a short safety
-  // timeout) BEFORE rendering the app, so a returning user opening on a
-  // fresh browser/WebView (empty local cache) never briefly sees $0.00 —
-  // it waits for the real synced value first, falling back to the local
-  // cached value only if Firebase doesn't respond in time.
-  await new Promise((resolve) => {
-    let done = false;
-    const finish = () => { if(!done){ done = true; resolve(); } };
-    const safety = setTimeout(finish, 3000);
-    const run = () => { runFirebaseInit().finally(() => { clearTimeout(safety); finish(); }); };
-    if(window._cpFirebaseReady){
-      run();
-    } else {
-      document.addEventListener('cpFirebaseReady', run, { once:true });
-    }
-  });
-
-  if(lang){
-    selectedLang = lang;
-    document.getElementById('lang-screen').style.display = 'none';
-    startApp();
-  } else {
-    buildLangScreen();
-  }
+if(window._cpFirebaseReady){
+  runFirebaseInit();
+} else {
+  document.addEventListener('cpFirebaseReady', runFirebaseInit, { once:true });
 }
 
-boot();
+if(lang){
+  selectedLang = lang;
+  document.getElementById('lang-screen').style.display = 'none';
+  startApp();
+} else {
+  buildLangScreen();
+}
 </script>
 </body>
 </html>
